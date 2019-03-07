@@ -230,6 +230,12 @@ class plot_application:
         # ax.autoscale(True)
 
         self.axisEqual3D(ax)
+        ylim = np.max(np.abs(self.ax.get_ylim()))
+        xlim = np.max(np.abs(self.ax.get_xlim()))
+        zlim = np.max(np.abs(self.ax.get_zlim()))
+        self.ax.set_ylim([-ylim, ylim])
+        self.ax.set_xlim([-xlim, xlim])
+        self.ax.set_zlim([-zlim, zlim])
         if self.axis_var.get() == 1:
             self.ax.set_axis_on()
         else:
@@ -352,7 +358,7 @@ class plot_application:
             self.JPL_numbers = dict(("'"+k.strip()+"'",v.strip()) for k,v in JPL_numbers.items())
             self.save_obj(self.JPL_numbers,self.filename)
         else:
-            print('found .json file with DB IDs')
+            print('found .pckl file with DB IDs')
             self.JPL_numbers = self.load_obj(self.filename)
         if self.my_file2.is_file():
             print('{0} found! adding small bodies to list'.format(self.my_file2))
