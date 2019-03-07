@@ -37,7 +37,13 @@ class plot_application:
         self.orbit_colors = []
         self.list = []
         self.resolution = 50
-        self.custom_color =  [0.3,0.3,0.3]
+        self.custom_color =  [0.1,0.1,0.1]
+        self.textsize = 8
+        self.markersize = 7
+        self.orbit_linewidth = 1
+        self.refplane_linewidth = 0.1
+        self.text_xoffset = 0
+        self.text_yoffset = 4
         self.dt = datetime.datetime.now()
         self.julian_date =  "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
         self.order_of_keplers = ['excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance','sidereal_period']
@@ -198,10 +204,16 @@ class plot_application:
         if clear_axis:
             self.ax.cla()
             ax.scatter(0,0,0,marker='o',s = 20,color='yellow')
-            self.annotate3D(ax, s='sun', xyz=[0,0,0], fontsize=5, xytext=(-0,0),textcoords='offset points', ha='right',va='bottom',color ="white")
+            self.annotate3D(ax, s='sun', xyz=[0,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color ="white")
             ax.set_xlabel('X axis in km')
             ax.set_ylabel('Y axis in km')
             ax.set_zlabel('Z axis in km')
+            ax.xaxis.label.set_color('white')
+            ax.yaxis.label.set_color('white')
+            ax.zaxis.label.set_color('white')
+            ax.tick_params(axis='x', colors='white')
+            ax.tick_params(axis='y', colors='white')
+            ax.tick_params(axis='z', colors='white')
             ax.w_xaxis.set_pane_color((0, 0, 0, .6))
             ax.w_yaxis.set_pane_color((0, 0, 0, .6))
             ax.w_zaxis.set_pane_color((0, 0, 0, .6))
@@ -209,19 +221,19 @@ class plot_application:
         for orbit in orbits:
             if None in orbit:
                 continue
-            ph = ax.plot(orbit[0],orbit[1],orbit[2],linewidth=0.5,clip_on=False)
+            ph = ax.plot(orbit[0],orbit[1],orbit[2],linewidth=self.orbit_linewidth,clip_on=False)
             if refplane_var == 1:
                 index2 = 0
                 for x,y,z in zip(*orbit.tolist()):
-                    ax.plot([x,x],[y,y],[z,0],'white',linewidth=0.3,clip_on=False)
+                    ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
             orbit_colors.append(ph[0].get_color())
         for pos, object in zip(positions,objects):
             if None in pos:
                 continue
-            ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=3,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5.0,label=self.JPL_numbers[object])
-            self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=5.5, xytext=(-0,0),textcoords='offset points', ha='center',va='bottom',color = 'white',clip_on=False)
+            ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5.0,label=self.JPL_numbers[object])
+            self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = 'white',clip_on=False)
             if self.annot_var.get() == 1:
-                self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=5.5, xytext=(-0,-3),textcoords='offset points', ha='center',va='top',color = 'white',clip_on=False)
+                self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white',clip_on=False)
             index = index + 1
 
         # # recompute the ax.dataLim
@@ -236,6 +248,14 @@ class plot_application:
         self.ax.set_ylim([-ylim, ylim])
         self.ax.set_xlim([-xlim, xlim])
         self.ax.set_zlim([-zlim, zlim])
+        # ylim = self.ax.get_ylim()
+        # xlim = self.ax.get_xlim()
+        # x = 10*np.linspace(xlim[0],xlim[1],100)
+        # y = 10*np.linspace(ylim[0],ylim[1],100)
+        # xx , yy = np.meshgrid(x,y)
+        # z = 0*xx
+        # self.ax.plot_wireframe(xx,yy,z,linewidth=0.1,clip_on=False,color='white',rcount=400,ccount=400)
+
         if self.axis_var.get() == 1:
             self.ax.set_axis_on()
         else:
