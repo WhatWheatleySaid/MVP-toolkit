@@ -35,6 +35,7 @@ class plot_application:
         self.filename2 = 'smallbodies'
         self.JPL_numbers = []
         self.orbit_colors = []
+        self.equinox_artists = []
         self.list = []
         self.resolution = 50
         self.custom_color =  [0.1,0.1,0.1]
@@ -61,17 +62,27 @@ class plot_application:
         self.master.wm_title("JPL horizons DB visualisation")
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)  # A tk.DrawingArea.
         self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
+        self.equinox_cid = self.fig.canvas.mpl_connect('draw_event',self.scale_equinox)
         plt.rcParams['savefig.facecolor']= self.custom_color
         plt.rcParams['grid.color'] = [0.5,0.5,0.5]
         plt.rcParams['grid.linewidth'] = 0.2
-        self.ax = self.fig.gca(projection = '3d',facecolor =  self.custom_color)
+        self.ax = self.fig.gca(projection = '3d',facecolor =  self.custom_color,proj_type = 'ortho')
         self.canvas.get_tk_widget().grid(row=0,column=0,columnspan=10,rowspan=10,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
-
+        self.viewbuttons_frame = tkinter.Frame(master= self.canvas.get_tk_widget())
+        self.viewbuttons_frame.place(rely=1,relx=0,anchor=tkinter.SW)
 
         self.button1 = tkinter.Button(master=self.master, text="new Plot", command=lambda : self.refresh_plot(True))
         self.button1.grid(row=3,column=11,columnspan=2,sticky=tkinter.N+tkinter.W+tkinter.E)
         self.button2  = tkinter.Button(master=self.master, text="add to Plot", command=lambda : self.refresh_plot(False))
         self.button2.grid(row=4,column=11,columnspan=2,sticky=tkinter.N+tkinter.W+tkinter.E)
+        self.topview_button = tkinter.Button(master=self.viewbuttons_frame,text='TOP', command=lambda:self.change_view('top'))
+        self.topview_button.configure(width=3,height=1)
+        self.topview_button.grid(row=0,column=0)
+        self.rightview_button = tkinter.Button(master=self.viewbuttons_frame,text='XZ', command=lambda:self.change_view('XZ'))
+        self.rightview_button.configure(width=3,height=1)
+        self.rightview_button.grid(row=0,column=1)
+
+
         self.listbox = tkinter.Listbox(master=self.master,selectmode=tkinter.MULTIPLE,exportselection=False)
         self.listbox.grid(row=0,column=11,columnspan=2,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         tkinter.Label(master=self.master,text= 'type search term:').grid(row=1,column=11,sticky=tkinter.N+tkinter.W)
@@ -82,9 +93,11 @@ class plot_application:
         self.refplane_var = tkinter.IntVar(value=0)
         self.annot_var = tkinter.IntVar(value=0)
         self.axis_var = tkinter.IntVar(value=1)
+        self.proj_var = tkinter.IntVar(value=0)
         self.refplane_checkbutton = tkinter.Checkbutton(master=self.master,text='referenceplane lines',variable = self.refplane_var,command=self.toggle_refplane).grid(row=6,column=11,sticky=tkinter.N+tkinter.W)
         self.annot_checkbutton = tkinter.Checkbutton(master=self.master,text='show date at objectposition',variable = self.annot_var,command=self.toggle_refplane).grid(row=6,column=12,sticky=tkinter.N+tkinter.W)
         self.axis_checkbutton = tkinter.Checkbutton(master=self.master,text='show coordinate axis',variable = self.axis_var,command=self.toggle_axis).grid(row=7,column=11,sticky=tkinter.N+tkinter.W)
+        self.proj_checkbutton = tkinter.Checkbutton(master=self.master,text='perspective projection',variable = self.proj_var,command=self.toggle_proj).grid(row=7,column=12,sticky=tkinter.N+tkinter.W)
         self.prog_bar = tkinter.ttk.Progressbar(self.master,orient='horizontal',length=200,mode='determinate')
         self.prog_bar.grid(row=8,column=11,columnspan=2,sticky=tkinter.S+tkinter.W+tkinter.E)
         for k,v in self.JPL_numbers.items():
@@ -105,6 +118,7 @@ class plot_application:
             Annotation.__init__(self,s, xy=(0,0), *args, **kwargs)
             self._verts3d = xyz
 
+
         def draw(self, renderer):
             xs3d, ys3d, zs3d = self._verts3d
             xs, ys, zs = proj_transform(xs3d, ys3d, zs3d, renderer.M)
@@ -116,6 +130,7 @@ class plot_application:
 
         tag = self.Annotation3D(s, *args, **kwargs)
         ax.add_artist(tag)
+        return tag
 
     def rot_x(self,phi):
         '''returns rotational matrix around x, phi in rad'''
@@ -123,6 +138,30 @@ class plot_application:
     def rot_z(self,rho):
         '''returns rotational matrix around z, rho in rad'''
         return np.array([[np.cos(rho),-np.sin(rho),0],[np.sin(rho),np.cos(rho),0],[0,0,1]])
+
+    def change_view(self,view):
+        if view == "top":
+            self.ax.view_init(90,-90)
+        elif view == "XZ":
+            self.ax.view_init(0,-90)
+        self.canvas.draw()
+
+    def scale_equinox(self,event):
+        self.fig.canvas.mpl_disconnect(self.equinox_cid)
+        if len(self.equinox_artists)>0:
+            for i in range(0,len(self.equinox_artists)):
+                if i == 3:
+                    self.equinox_artists[i].remove()
+                    continue
+                self.equinox_artists[i][0].remove()
+        self.equinox_artists = []
+        xlim = self.ax.get_xlim()
+        length = 0.2 *xlim[1]
+        self.equinox_artists.append(self.ax.plot([0,length] , [0,0],[0,0],color='white'))
+        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,0.05*length],[0,0],color='white'))
+        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,-0.05*length],[0,0],color='white'))
+        self.equinox_artists.append(self.annotate3D(self.ax, s='vernal equinox', xyz=[length,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white'))
+        self.equinox_cid = self.fig.canvas.mpl_connect('draw_event',self.scale_equinox)
 
     def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
         '''calculate orbit 3x1 radius vector'''
@@ -223,7 +262,6 @@ class plot_application:
                 continue
             ph = ax.plot(orbit[0],orbit[1],orbit[2],linewidth=self.orbit_linewidth,clip_on=False)
             if refplane_var == 1:
-                index2 = 0
                 for x,y,z in zip(*orbit.tolist()):
                     ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
             orbit_colors.append(ph[0].get_color())
@@ -231,6 +269,7 @@ class plot_application:
             if None in pos:
                 continue
             ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5.0,label=self.JPL_numbers[object])
+
             self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = 'white',clip_on=False)
             if self.annot_var.get() == 1:
                 self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white',clip_on=False)
@@ -281,7 +320,7 @@ class plot_application:
             self.dt = self.calendar_widget.selection_get()
             batchfile['TLIST'] = "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
             r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile)
-            print(r.text)
+            # print(r.text)
             count = count + 1
             self.prog_bar["value"] = count
             self.prog_bar.update()
@@ -333,6 +372,12 @@ class plot_application:
     def toggle_refplane(self):
         self.plot_orbits(self.ax,self.current_objects['orbits'],self.current_objects['positions'],self.objects,refplane_var=self.refplane_var.get())
 
+    def toggle_proj(self):
+        if self.proj_var.get() == 1:
+            self.ax.set_proj_type('persp')
+        else:
+            self.ax.set_proj_type('ortho')#
+        self.canvas.draw()
     def clicked_on(self,event):
         # artist_dir = dir(event.artist)
         # pprint(arist_dir)
