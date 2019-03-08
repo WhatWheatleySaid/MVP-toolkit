@@ -42,9 +42,10 @@ class plot_application:
         self.textsize = 8
         self.markersize = 7
         self.orbit_linewidth = 1
-        self.refplane_linewidth = 0.1
+        self.refplane_linewidth = 0.3
         self.text_xoffset = 0
         self.text_yoffset = 4
+        self.view_cid = 0
         self.dt = datetime.datetime.now()
         self.julian_date =  "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
         self.order_of_keplers = ['excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance','sidereal_period']
@@ -62,7 +63,6 @@ class plot_application:
         self.master.wm_title("JPL horizons DB visualisation")
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)  # A tk.DrawingArea.
         self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
-        self.equinox_cid = self.fig.canvas.mpl_connect('draw_event',self.scale_equinox)
         plt.rcParams['savefig.facecolor']= self.custom_color
         plt.rcParams['grid.color'] = [0.5,0.5,0.5]
         plt.rcParams['grid.linewidth'] = 0.2
@@ -70,6 +70,8 @@ class plot_application:
         self.canvas.get_tk_widget().grid(row=0,column=0,columnspan=10,rowspan=10,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         self.viewbuttons_frame = tkinter.Frame(master= self.canvas.get_tk_widget())
         self.viewbuttons_frame.place(rely=1,relx=0,anchor=tkinter.SW)
+
+        self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
 
         self.button1 = tkinter.Button(master=self.master, text="new Plot", command=lambda : self.refresh_plot(True))
         self.button1.grid(row=3,column=11,columnspan=2,sticky=tkinter.N+tkinter.W+tkinter.E)
@@ -81,6 +83,9 @@ class plot_application:
         self.rightview_button = tkinter.Button(master=self.viewbuttons_frame,text='XZ', command=lambda:self.change_view('XZ'))
         self.rightview_button.configure(width=3,height=1)
         self.rightview_button.grid(row=0,column=1)
+        self.xyzview_button = tkinter.Button(master=self.viewbuttons_frame,text='XYZ', command=lambda:self.change_view('XYZ'))
+        self.xyzview_button.configure(width=3,height=1)
+        self.xyzview_button.grid(row=0,column=3)
 
 
         self.listbox = tkinter.Listbox(master=self.master,selectmode=tkinter.MULTIPLE,exportselection=False)
@@ -142,9 +147,28 @@ class plot_application:
     def change_view(self,view):
         if view == "top":
             self.ax.view_init(90,-90)
+            self.axis_visibility(event = None,axis='z',visible=False)
+            self.view_cid = self.fig.canvas.mpl_connect('draw_event',lambda event: self.axis_visibility(event,axis='z',visible=True))
         elif view == "XZ":
             self.ax.view_init(0,-90)
+            self.axis_visibility(event = None,axis='y',visible=False)
+            self.view_cid = self.fig.canvas.mpl_connect('draw_event',lambda event: self.axis_visibility(event,axis='y',visible=True))
+        elif view == "XYZ":
+            self.ax.view_init(45,-45)
         self.canvas.draw()
+
+    def axis_visibility(self,event,axis,visible):
+        if axis == 'z':
+            self.ax.set_zticklabels(self.ax.get_zticklabels(),visible=visible)
+            self.ax.set_zlabel(self.ax.get_zlabel(),visible=visible)
+        elif axis == 'y':
+            self.ax.set_yticklabels(self.ax.get_yticklabels(),visible=visible)
+            self.ax.set_ylabel(self.ax.get_ylabel(),visible=visible)
+        elif axis == 'x':
+            self.ax.set_xticklabels(self.ax.get_xticklabels(),visible=visible)
+            self.ax.set_xlabel(self.ax.get_xlabel(),visible=visible)
+        self.fig.canvas.mpl_disconnect(self.view_cid)
+
 
     def scale_equinox(self,event):
         self.fig.canvas.mpl_disconnect(self.equinox_cid)
@@ -156,12 +180,12 @@ class plot_application:
                 self.equinox_artists[i][0].remove()
         self.equinox_artists = []
         xlim = self.ax.get_xlim()
-        length = 0.2 *xlim[1]
-        self.equinox_artists.append(self.ax.plot([0,length] , [0,0],[0,0],color='white'))
-        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,0.05*length],[0,0],color='white'))
-        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,-0.05*length],[0,0],color='white'))
+        length = 0.15 *xlim[1]
+        self.equinox_artists.append(self.ax.plot([0,length] , [0,0],[0,0],color='white',linewidth=self.refplane_linewidth))
+        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,0.05*length],[0,0.05*length],color='white',linewidth=self.refplane_linewidth))
+        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,-0.05*length],[0,-0.05*length],color='white',linewidth=self.refplane_linewidth))
         self.equinox_artists.append(self.annotate3D(self.ax, s='vernal equinox', xyz=[length,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white'))
-        self.equinox_cid = self.fig.canvas.mpl_connect('draw_event',self.scale_equinox)
+        self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
 
     def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
         '''calculate orbit 3x1 radius vector'''
@@ -181,7 +205,10 @@ class plot_application:
             r = np.matmul(self.rot_x(i),r)
             r = np.matmul(self.rot_z(Omega),r)
         elif e >1:
-            nu = np.linspace(-3*np.pi/4,3*np.pi/4,self.resolution)
+            plot_range = 3*np.pi/4
+            if plot_range < np.abs(self.kepler_dict["true_anomaly"]):
+                plot_range = np.abs(self.kepler_dict["true_anomaly"])
+            nu = np.linspace(-plot_range,plot_range,self.resolution)
             p = a * (1-(e**2))
             r = p/(1+e*np.cos(nu))
             r = np.array([np.multiply(r,np.cos(nu)) , np.multiply(r,np.sin(nu)), np.zeros(len(nu))])
@@ -275,25 +302,24 @@ class plot_application:
                 self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white',clip_on=False)
             index = index + 1
 
-        # # recompute the ax.dataLim
-        # ax.relim()
-        # # update ax.viewLim using the new dataLim
-        # ax.autoscale(True)
-
+        # # # recompute the ax.dataLim
+        # # ax.relim()
+        # # # update ax.viewLim using the new dataLim
+        # # ax.autoscale(True)
+        #
         self.axisEqual3D(ax)
         ylim = np.max(np.abs(self.ax.get_ylim()))
         xlim = np.max(np.abs(self.ax.get_xlim()))
         zlim = np.max(np.abs(self.ax.get_zlim()))
-        self.ax.set_ylim([-ylim, ylim])
-        self.ax.set_xlim([-xlim, xlim])
-        self.ax.set_zlim([-zlim, zlim])
+        max = np.amax([ylim,xlim,zlim])
+        self.ax.set_ylim([-max, max])
+        self.ax.set_xlim([-max, max])
+        self.ax.set_zlim([-max, max])
+        self.scale_equinox(None)
         # ylim = self.ax.get_ylim()
         # xlim = self.ax.get_xlim()
-        # x = 10*np.linspace(xlim[0],xlim[1],100)
-        # y = 10*np.linspace(ylim[0],ylim[1],100)
-        # xx , yy = np.meshgrid(x,y)
-        # z = 0*xx
-        # self.ax.plot_wireframe(xx,yy,z,linewidth=0.1,clip_on=False,color='white',rcount=400,ccount=400)
+        # self.ax.plot([20*xlim[0],20*xlim[1]],[0,0],[0,0],linewidth=0.3,clip_on=False,color='white')
+        # self.ax.plot([0,0],[20*ylim[0],20*ylim[1]],[0,0],linewidth=0.3,clip_on=False,color='white')
 
         if self.axis_var.get() == 1:
             self.ax.set_axis_on()
@@ -320,7 +346,7 @@ class plot_application:
             self.dt = self.calendar_widget.selection_get()
             batchfile['TLIST'] = "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
             r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile)
-            # print(r.text)
+            print(r.text)
             count = count + 1
             self.prog_bar["value"] = count
             self.prog_bar.update()
@@ -357,8 +383,8 @@ class plot_application:
             if search_term.lower() in v.lower() and not (search_term.lower() in selected_items):
                 self.listbox.insert(tkinter.END,v)
         for item in selected_items:
-            self.listbox.insert(1,item)
-            self.listbox.selection_set(1)
+            self.listbox.insert(0,item)
+            self.listbox.selection_set(0)
         return True
 
     def toggle_axis(self):
