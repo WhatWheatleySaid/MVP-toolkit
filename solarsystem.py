@@ -22,6 +22,17 @@ from matplotlib.backends.backend_tkagg import (
 from matplotlib.backend_bases import key_press_handler
 from tkcalendar import DateEntry,Calendar
 
+class celestial_artist:
+    def __init__(self,id,artist,orbit,pos,date,color):
+        self.id = id
+        self.artist = artist
+        self.orbit = orbit
+        self.pos = pos
+        self.date = date
+        self.color = color
+
+
+
 class plot_application:
     def __init__(self, master):
         self.master = master
@@ -47,6 +58,7 @@ class plot_application:
         self.text_yoffset = 4
         self.view_cid = 0
         self.dt = datetime.datetime.now()
+        self.dates = []
         self.julian_date =  "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
         self.order_of_keplers = ['excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance','sidereal_period']
         self.objects = ["'399'","'499'","'-143205'"] #earth,mars,Tesla roadster, ... ceres : ,"'5993'"
@@ -112,8 +124,10 @@ class plot_application:
         self.nu = np.linspace(0,2*np.pi,self.resolution)
         orbits,positions = self.request_keplers(self.objects,self.batchfile)
         self.current_objects = {'orbits':orbits,'positions':positions}
-        self.plot_orbits(self.ax,orbits,positions,self.objects,refresh_canvas=True,refplane_var=self.refplane_var.get())
-
+        artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,self.objects,refresh_canvas=True,refplane_var=self.refplane_var.get())
+        self.current_objects['dates'] = dates
+        self.current_objects['colors'] = colors
+        self.current_objects['artists'] = artists
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     class Annotation3D(Annotation):
@@ -205,9 +219,14 @@ class plot_application:
             r = np.matmul(self.rot_x(i),r)
             r = np.matmul(self.rot_z(Omega),r)
         elif e >1:
-            plot_range = 3*np.pi/4
-            if plot_range < np.abs(self.kepler_dict["true_anomaly"]):
-                plot_range = np.abs(self.kepler_dict["true_anomaly"])
+            if self.kepler_dict["true_anomaly"] > 2:
+                plot_range = 3*np.pi/4
+                if plot_range < np.abs(self.kepler_dict["true_anomaly"]):
+                    plot_range = np.abs(self.kepler_dict["true_anomaly"])
+            else:
+                plot_range = 3/4 * np.pi -np.pi
+                if plot_range > np.abs(self.kepler_dict["true_anomaly"]):
+                    plot_range = np.abs(self.kepler_dict["true_anomaly"])
             nu = np.linspace(-plot_range,plot_range,self.resolution)
             p = a * (1-(e**2))
             r = p/(1+e*np.cos(nu))
@@ -256,6 +275,9 @@ class plot_application:
         if clear_axis:
             self.current_objects['orbits'] = []
             self.current_objects['positions'] = []
+            self.current_objects['dates'] = []
+            self.current_objects['colors'] = []
+            self.current_objects['artists'] = []
             self.objects = []
         objects = self.get_selected()
         objects = [self.JPL_name2num[object] for object in objects]
@@ -263,10 +285,19 @@ class plot_application:
         orbits,positions = self.request_keplers(objects,self.batchfile)
         self.current_objects['orbits'].extend(orbits)
         self.current_objects['positions'].extend(positions)
-        self.plot_orbits(self.ax,orbits,positions,objects,refresh_canvas = True, clear_axis=clear_axis,refplane_var=self.refplane_var.get())
+        artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,objects,refresh_canvas = True, clear_axis=clear_axis,refplane_var=self.refplane_var.get())
+        self.current_objects['artists'].extend(artists)
+        self.current_objects['colors'].extend(colors)
+        self.current_objects['dates'].extend(dates)
 
-    def plot_orbits(self,ax,orbits,positions,objects,refresh_canvas=True,clear_axis = True,refplane_var = 1):
+
+    def plot_orbits(self,ax,orbits,positions,objects,refresh_canvas=True,clear_axis = True,refplane_var = 1,colors=None,saved_dates=None):
         orbit_colors = []
+        if colors != None:
+            orbit_colors = colors
+
+        marker_artists = []
+        dates = []
         if clear_axis:
             self.ax.cla()
             ax.scatter(0,0,0,marker='o',s = 20,color='yellow')
@@ -295,8 +326,11 @@ class plot_application:
         for pos, object in zip(positions,objects):
             if None in pos:
                 continue
-            ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5.0,label=self.JPL_numbers[object])
+            if not(saved_dates == None):
+                self.dt = saved_dates[index]
 
+            marker_artists.append(ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5.0))
+            dates.append(self.dt)
             self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = 'white',clip_on=False)
             if self.annot_var.get() == 1:
                 self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white',clip_on=False)
@@ -328,7 +362,7 @@ class plot_application:
 
         if refresh_canvas:
             self.canvas.draw()
-
+        return marker_artists,orbit_colors,dates
     def on_closing(self):
         if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
             self.master.quit()
@@ -356,6 +390,10 @@ class plot_application:
                 positions.append([None,None])
             elif 'is out of bounds, no action taken' in r.text:
                 print('{0} is out of bounds, no action taken (couldnt find {1} in batch interface of JPL horizonss)'.format(self.JPL_numbers[object],object))
+                orbits.append([None,None])
+                positions.append([None,None])
+            elif 'No such record, positive values only' in r.text:
+                print('No record for {0}({1}), positive values only'.format(object,self.JPL_numbers[object]))
                 orbits.append([None,None])
                 positions.append([None,None])
             else:
@@ -396,7 +434,7 @@ class plot_application:
             self.canvas.draw()
 
     def toggle_refplane(self):
-        self.plot_orbits(self.ax,self.current_objects['orbits'],self.current_objects['positions'],self.objects,refplane_var=self.refplane_var.get())
+        self.plot_orbits(self.ax,self.current_objects['orbits'],self.current_objects['positions'],self.objects,refplane_var=self.refplane_var.get(),saved_dates = self.current_objects['dates'],colors = self.current_objects['colors'])
 
     def toggle_proj(self):
         if self.proj_var.get() == 1:
@@ -404,6 +442,7 @@ class plot_application:
         else:
             self.ax.set_proj_type('ortho')#
         self.canvas.draw()
+
     def clicked_on(self,event):
         # artist_dir = dir(event.artist)
         # pprint(arist_dir)
