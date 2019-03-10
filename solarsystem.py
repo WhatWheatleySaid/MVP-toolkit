@@ -10,28 +10,29 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 from matplotlib.text import Annotation
 from matplotlib import colors
+from matplotlib import pyplot as plt
 from pathlib import Path
 import pickle
 import tkinter
 import operator
 import csv
 
-from matplotlib.backends.backend_tkagg import (
-    FigureCanvasTkAgg, NavigationToolbar2Tk)
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 # Implement the default Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
 from tkcalendar import DateEntry,Calendar
+from tkinter import filedialog
+# import io
+# from PIL import Image
 
-class celestial_artist:
-    def __init__(self,id,artist,orbit,pos,date,color):
-        self.id = id
-        self.artist = artist
-        self.orbit = orbit
-        self.pos = pos
-        self.date = date
-        self.color = color
-
-
+# class celestial_artist:
+#     def __init__(self,id,artist,orbit,pos,date,color):
+#         self.id = id
+#         self.artist = artist
+#         self.orbit = orbit
+#         self.pos = pos
+#         self.date = date
+#         self.color = color
 
 class plot_application:
     def __init__(self, master):
@@ -44,11 +45,14 @@ class plot_application:
         self.port = '6775'
         self.filename = 'DBNumbers'
         self.filename2 = 'smallbodies'
+        self.cursor = 'tcross'
+        self.turn_cursor = 'exchange'
+        self.zoom_cursor = 'sizing   '
         self.JPL_numbers = []
         self.orbit_colors = []
         self.equinox_artists = []
         self.list = []
-        self.resolution = 50
+        self.resolution = 80
         self.custom_color =  [0.1,0.1,0.1]
         self.textsize = 8
         self.markersize = 7
@@ -74,7 +78,12 @@ class plot_application:
         self.fig = plt.figure(facecolor = self.custom_color)
         self.master.wm_title("JPL horizons DB visualisation")
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)  # A tk.DrawingArea.
+        self.canvas.get_tk_widget().bind('<ButtonPress-1>',self.canvas_mouseturn,add='+')
+        self.canvas.get_tk_widget().bind('<ButtonPress-3>',self.canvas_mousezoom,add='+')
+        self.canvas.get_tk_widget().bind('<ButtonRelease-3>',self.canvas_mouserelease,add='+')
+        self.canvas.get_tk_widget().bind('<ButtonRelease-1>',self.canvas_mouserelease,add='+')
         self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
+        self.canvas.get_tk_widget().config(cursor=self.cursor)
         plt.rcParams['savefig.facecolor']= self.custom_color
         plt.rcParams['grid.color'] = [0.5,0.5,0.5]
         plt.rcParams['grid.linewidth'] = 0.2
@@ -85,17 +94,27 @@ class plot_application:
 
         self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
 
+        self.menubar = tkinter.Menu(self.master)
+        self.filemenu = tkinter.Menu(self.menubar,tearoff = 0)
+        self.filemenu.add_command(label="save figure as", command=self.save_file_as)
+        self.filemenu.add_command(label="preferences", command=self.preferences_menu)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Exit", command=self.master.quit)
+        self.menubar.add_cascade(label='File',menu=self.filemenu)
+
+        self.master.config(menu=self.menubar)
+
         self.button1 = tkinter.Button(master=self.master, text="new Plot", command=lambda : self.refresh_plot(True))
         self.button1.grid(row=3,column=11,columnspan=2,sticky=tkinter.N+tkinter.W+tkinter.E)
         self.button2  = tkinter.Button(master=self.master, text="add to Plot", command=lambda : self.refresh_plot(False))
         self.button2.grid(row=4,column=11,columnspan=2,sticky=tkinter.N+tkinter.W+tkinter.E)
-        self.topview_button = tkinter.Button(master=self.viewbuttons_frame,text='TOP', command=lambda:self.change_view('top'))
+        self.topview_button = tkinter.Button(master=self.viewbuttons_frame,text='TOP',borderwidth = 3, command=lambda:self.change_view('top'))
         self.topview_button.configure(width=3,height=1)
         self.topview_button.grid(row=0,column=0)
-        self.rightview_button = tkinter.Button(master=self.viewbuttons_frame,text='XZ', command=lambda:self.change_view('XZ'))
+        self.rightview_button = tkinter.Button(master=self.viewbuttons_frame,text='XZ',borderwidth = 3, command=lambda:self.change_view('XZ'))
         self.rightview_button.configure(width=3,height=1)
         self.rightview_button.grid(row=0,column=1)
-        self.xyzview_button = tkinter.Button(master=self.viewbuttons_frame,text='XYZ', command=lambda:self.change_view('XYZ'))
+        self.xyzview_button = tkinter.Button(master=self.viewbuttons_frame,text='XYZ',borderwidth = 3,command=lambda:self.change_view('XYZ'))
         self.xyzview_button.configure(width=3,height=1)
         self.xyzview_button.grid(row=0,column=3)
 
@@ -143,6 +162,40 @@ class plot_application:
             xs, ys, zs = proj_transform(xs3d, ys3d, zs3d, renderer.M)
             self.xy=(xs,ys)
             Annotation.draw(self, renderer)
+
+    def canvas_mouseturn(self,event):
+        self.canvas.get_tk_widget().config(cursor=self.turn_cursor)
+
+    def canvas_mousezoom(self,event):
+        self.canvas.get_tk_widget().config(cursor=self.zoom_cursor)
+
+    def canvas_mouserelease(self,event):
+        self.canvas.get_tk_widget().config(cursor=self.cursor)
+
+    def save_file_as(self):
+        dir = filedialog.asksaveasfilename(defaultextension=".png")
+        if dir == '':
+            return
+        print(dir)
+        self.fig.canvas.mpl_disconnect(self.view_cid)
+        plt.savefig(dir)
+        # self.axis_visibility(None,'z',True)
+        # self.axis_visibility(None,'y',True)
+
+        '''does weird stuff with the image (atrifacts)'''
+        # ps = self.canvas.get_tk_widget().postscript(colormode='color')
+        # img = Image.open(io.BytesIO(ps.encode('utf-8')))
+        # img.save(dir)
+
+    def preferences_menu(self):
+        top = tkinter.Toplevel()
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title("About this application...")
+
+        button = tkinter.Button(top, text="Dismiss", command=top.destroy)
+        button.pack()
 
     def annotate3D(self,ax, s, *args, **kwargs):
         '''add anotation text s to to Axes3d ax'''
