@@ -14,11 +14,13 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 import pickle
 import tkinter
+from tkinter.colorchooser import *
 import operator
 import csv
+import configparser,ast
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-# Implement the default Matplotlib key bindings.
+# Implement the appearance Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
 from tkcalendar import DateEntry,Calendar
 from tkinter import filedialog
@@ -47,19 +49,24 @@ class plot_application:
         self.filename2 = 'smallbodies'
         self.cursor = 'tcross'
         self.turn_cursor = 'exchange'
-        self.zoom_cursor = 'sizing   '
+        self.zoom_cursor = 'sizing'
         self.JPL_numbers = []
         self.orbit_colors = []
         self.equinox_artists = []
         self.list = []
+
         self.resolution = 80
         self.custom_color =  [0.1,0.1,0.1]
+        self.gridcolor = [0.5,0.5,0.5]
+        self.gridlinewidth = 0.2
         self.textsize = 8
         self.markersize = 7
         self.orbit_linewidth = 1
         self.refplane_linewidth = 0.3
         self.text_xoffset = 0
         self.text_yoffset = 4
+        self.check_config()
+
         self.view_cid = 0
         self.dt = datetime.datetime.now()
         self.dates = []
@@ -85,14 +92,14 @@ class plot_application:
         self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
         self.canvas.get_tk_widget().config(cursor=self.cursor)
         plt.rcParams['savefig.facecolor']= self.custom_color
-        plt.rcParams['grid.color'] = [0.5,0.5,0.5]
-        plt.rcParams['grid.linewidth'] = 0.2
+        plt.rcParams['grid.color'] = self.gridcolor
+        plt.rcParams['grid.linewidth'] = self.gridlinewidth
         self.ax = self.fig.gca(projection = '3d',facecolor =  self.custom_color,proj_type = 'ortho')
         self.canvas.get_tk_widget().grid(row=0,column=0,columnspan=10,rowspan=10,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         self.viewbuttons_frame = tkinter.Frame(master= self.canvas.get_tk_widget())
         self.viewbuttons_frame.place(rely=1,relx=0,anchor=tkinter.SW)
 
-        self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
+        # self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
 
         self.menubar = tkinter.Menu(self.master)
         self.filemenu = tkinter.Menu(self.menubar,tearoff = 0)
@@ -163,6 +170,38 @@ class plot_application:
             self.xy=(xs,ys)
             Annotation.draw(self, renderer)
 
+    def check_config(self):
+        file = Path("./config.ini")
+        config = configparser.ConfigParser()
+        if file.is_file():
+            print('config found, reading from ./config.ini')
+            config.read('config.ini')
+            self.custom_color = ast.literal_eval(config['appearance']['custom_color'])
+            self.gridcolor = ast.literal_eval(config['appearance']['gridcolor'])
+            self.gridlinewidth = float(config['appearance']['gridlinewidth'])
+            self.textsize = float(config['appearance']['textsize'])
+            self.markersize = float(config['appearance']['markersize'])
+            self.orbit_linewidth = float(config['appearance']['orbit_linewidth'])
+            self.refplane_linewidth = float(config['appearance']['refplane_linewidth'])
+            self.text_xoffset = float(config['appearance']['text_xoffset'])
+            self.text_yoffset = float(config['appearance']['text_yoffset'])
+
+        else:
+            print('no config found, generating new ./config.ini')
+            self.update_config()
+
+    def update_config(self):
+        config = configparser.ConfigParser()
+        config['appearance'] = \
+        {\
+        'custom_color':str(self.custom_color), 'gridcolor':str(self.gridcolor),\
+        'gridlinewidth':str(self.gridlinewidth), 'textsize':str(self.textsize), 'markersize':str(self.markersize),\
+        'orbit_linewidth':str(self.orbit_linewidth), 'refplane_linewidth':str(self.refplane_linewidth),\
+        'text_xoffset':str(self.text_xoffset), 'text_yoffset':str(self.text_yoffset)\
+        }
+        with open('config.ini', 'w') as configfile:
+            config.write(configfile)
+
     def canvas_mouseturn(self,event):
         self.canvas.get_tk_widget().config(cursor=self.turn_cursor)
 
@@ -174,7 +213,7 @@ class plot_application:
 
     def save_file_as(self):
         dir = filedialog.asksaveasfilename(defaultextension=".png")
-        if dir == '':
+        if dir == '' or dir == ():
             return
         print(dir)
         self.fig.canvas.mpl_disconnect(self.view_cid)
@@ -188,14 +227,49 @@ class plot_application:
         # img.save(dir)
 
     def preferences_menu(self):
+
+        def validate(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+            if text in '0123456789.-+':
+                try:
+                    float(value_if_allowed)
+                    return True
+                except ValueError:
+                    return False
+            else:
+                return False
+
+        def _from_rgb(rgb):
+            """translates an rgb list of int to a tkinter friendly color code
+            """
+            rgb = (int(255*rgb[0]),int(255*rgb[1]),int(255*rgb[2]))
+            return "#%02x%02x%02x" %rgb
+
+        def get_color(b):
+            color=askcolor(b.cget('bg'))
+            b.configure(bg=color[1])
+
         top = tkinter.Toplevel()
+        vcmd = (top.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         x = root.winfo_x()
         y = root.winfo_y()
         top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("About this application...")
+        top.title("preferences")
 
+        custom_color_var = tkinter.StringVar()
+        custom_color_var.set(str(self.custom_color))
+
+        appearance_frame =  tkinter.LabelFrame(top, text= 'appearance')
+        appearance_frame.grid(row=0,column= 0)
+
+        tkinter.Label(appearance_frame,text='background color:').grid(row=0,column=0)
+        custom_color_button = tkinter.Button(appearance_frame,text='',bg = _from_rgb(self.custom_color) ,command=lambda: get_color(custom_color_button))
+        custom_color_button.grid(row=0,column=1)
+        tkinter.Label(appearance_frame,text='background color:').grid(row=1,column=0)
+        grid_color_button = tkinter.Button(appearance_frame,text='',bg = _from_rgb(self.gridcolor) ,command=lambda: get_color(grid_color_button))
+        grid_color_button.grid(row=1,column=1)
         button = tkinter.Button(top, text="Dismiss", command=top.destroy)
-        button.pack()
+        button.grid(row=2,column=0)
+        top.attributes('-topmost',1)
 
     def annotate3D(self,ax, s, *args, **kwargs):
         '''add anotation text s to to Axes3d ax'''
@@ -382,7 +456,7 @@ class plot_application:
             if not(saved_dates == None):
                 self.dt = saved_dates[index]
 
-            marker_artists.append(ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5.0))
+            marker_artists.append(self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5,label =str(self.JPL_numbers[object]) ))
             dates.append(self.dt)
             self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = 'white',clip_on=False)
             if self.annot_var.get() == 1:
@@ -402,7 +476,7 @@ class plot_application:
         self.ax.set_ylim([-max, max])
         self.ax.set_xlim([-max, max])
         self.ax.set_zlim([-max, max])
-        self.scale_equinox(None)
+        # self.scale_equinox(None)
         # ylim = self.ax.get_ylim()
         # xlim = self.ax.get_xlim()
         # self.ax.plot([20*xlim[0],20*xlim[1]],[0,0],[0,0],linewidth=0.3,clip_on=False,color='white')
