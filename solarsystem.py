@@ -54,10 +54,11 @@ class plot_application:
         self.orbit_colors = []
         self.equinox_artists = []
         self.list = []
+        self.current_objects = {}
 
+        self.default_colors = ['#191919','#7f7f7f','#ffffff','#000000']
         self.resolution = 80
-        self.custom_color =  [0.1,0.1,0.1]
-        self.gridcolor = [0.5,0.5,0.5]
+        self.set_default_colors()
         self.gridlinewidth = 0.2
         self.textsize = 8
         self.markersize = 7
@@ -137,8 +138,8 @@ class plot_application:
         self.annot_var = tkinter.IntVar(value=0)
         self.axis_var = tkinter.IntVar(value=1)
         self.proj_var = tkinter.IntVar(value=0)
-        self.refplane_checkbutton = tkinter.Checkbutton(master=self.master,text='referenceplane lines',variable = self.refplane_var,command=self.toggle_refplane).grid(row=6,column=11,sticky=tkinter.N+tkinter.W)
-        self.annot_checkbutton = tkinter.Checkbutton(master=self.master,text='show date at objectposition',variable = self.annot_var,command=self.toggle_refplane).grid(row=6,column=12,sticky=tkinter.N+tkinter.W)
+        self.refplane_checkbutton = tkinter.Checkbutton(master=self.master,text='referenceplane lines',variable = self.refplane_var,command=self.redraw_current_objects).grid(row=6,column=11,sticky=tkinter.N+tkinter.W)
+        self.annot_checkbutton = tkinter.Checkbutton(master=self.master,text='show date at objectposition',variable = self.annot_var,command=self.redraw_current_objects).grid(row=6,column=12,sticky=tkinter.N+tkinter.W)
         self.axis_checkbutton = tkinter.Checkbutton(master=self.master,text='show coordinate axis',variable = self.axis_var,command=self.toggle_axis).grid(row=7,column=11,sticky=tkinter.N+tkinter.W)
         self.proj_checkbutton = tkinter.Checkbutton(master=self.master,text='perspective projection',variable = self.proj_var,command=self.toggle_proj).grid(row=7,column=12,sticky=tkinter.N+tkinter.W)
         self.prog_bar = tkinter.ttk.Progressbar(self.master,orient='horizontal',length=200,mode='determinate')
@@ -149,11 +150,15 @@ class plot_application:
 
         self.nu = np.linspace(0,2*np.pi,self.resolution)
         orbits,positions = self.request_keplers(self.objects,self.batchfile)
-        self.current_objects = {'orbits':orbits,'positions':positions}
-        artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,self.objects,refresh_canvas=True,refplane_var=self.refplane_var.get())
-        self.current_objects['dates'] = dates
-        self.current_objects['colors'] = colors
-        self.current_objects['artists'] = artists
+        if orbits == False:
+            pass
+        else:
+            self.current_objects = {'orbits':orbits,'positions':positions}
+            artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,self.objects,refresh_canvas=True,refplane_var=self.refplane_var.get())
+            self.current_objects['dates'] = dates
+            self.current_objects['colors'] = colors
+            self.current_objects['artists'] = artists
+
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     class Annotation3D(Annotation):
@@ -170,14 +175,28 @@ class plot_application:
             self.xy=(xs,ys)
             Annotation.draw(self, renderer)
 
+    def set_default_colors(self,redraw=False,buttons=None):
+        self.custom_color =  self.default_colors[0]
+        self.gridcolor = self.default_colors[1]
+        self.text_color = self.default_colors[2]
+        self.pane_color = self.default_colors[3]
+        if redraw:
+            self.redraw_current_objects()
+            counter = 0
+            for b in buttons:
+                b.configure(bg=self.default_colors[counter])
+                counter = counter + 1
+
     def check_config(self):
         file = Path("./config.ini")
         config = configparser.ConfigParser()
         if file.is_file():
             print('config found, reading from ./config.ini')
             config.read('config.ini')
-            self.custom_color = ast.literal_eval(config['appearance']['custom_color'])
-            self.gridcolor = ast.literal_eval(config['appearance']['gridcolor'])
+            self.custom_color = config['appearance']['custom_color']
+            self.gridcolor = config['appearance']['gridcolor']
+            self.text_color = config['appearance']['text_color']
+            self.pane_color = config['appearance']['pane_color']
             self.gridlinewidth = float(config['appearance']['gridlinewidth'])
             self.textsize = float(config['appearance']['textsize'])
             self.markersize = float(config['appearance']['markersize'])
@@ -185,6 +204,7 @@ class plot_application:
             self.refplane_linewidth = float(config['appearance']['refplane_linewidth'])
             self.text_xoffset = float(config['appearance']['text_xoffset'])
             self.text_yoffset = float(config['appearance']['text_yoffset'])
+
 
         else:
             print('no config found, generating new ./config.ini')
@@ -197,7 +217,8 @@ class plot_application:
         'custom_color':str(self.custom_color), 'gridcolor':str(self.gridcolor),\
         'gridlinewidth':str(self.gridlinewidth), 'textsize':str(self.textsize), 'markersize':str(self.markersize),\
         'orbit_linewidth':str(self.orbit_linewidth), 'refplane_linewidth':str(self.refplane_linewidth),\
-        'text_xoffset':str(self.text_xoffset), 'text_yoffset':str(self.text_yoffset)\
+        'text_xoffset':str(self.text_xoffset), 'text_yoffset':str(self.text_yoffset), 'text_color':str(self.text_color),\
+        'pane_color':str(self.pane_color)
         }
         with open('config.ini', 'w') as configfile:
             config.write(configfile)
@@ -210,6 +231,12 @@ class plot_application:
 
     def canvas_mouserelease(self,event):
         self.canvas.get_tk_widget().config(cursor=self.cursor)
+
+    def hex_to_rgb(self,h,alpha=1):
+        h = h.strip('#')
+        h = tuple(int(h[i:i+2], 16) for i in (0, 2 ,4))
+        h = (h[0]/255,h[1]/255,h[2]/255,alpha)
+        return h
 
     def save_file_as(self):
         dir = filedialog.asksaveasfilename(defaultextension=".png")
@@ -238,38 +265,63 @@ class plot_application:
             else:
                 return False
 
-        def _from_rgb(rgb):
-            """translates an rgb list of int to a tkinter friendly color code
-            """
-            rgb = (int(255*rgb[0]),int(255*rgb[1]),int(255*rgb[2]))
-            return "#%02x%02x%02x" %rgb
-
         def get_color(b):
             color=askcolor(b.cget('bg'))
+            if None in color:
+                return
             b.configure(bg=color[1])
 
         top = tkinter.Toplevel()
-        vcmd = (top.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+
         x = root.winfo_x()
         y = root.winfo_y()
         top.geometry("+%d+%d" % (x + 10, y + 20))
         top.title("preferences")
 
-        custom_color_var = tkinter.StringVar()
-        custom_color_var.set(str(self.custom_color))
+        textsize_var = tkinter.StringVar()
+        textsize_var.set(str(self.textsize))
 
         appearance_frame =  tkinter.LabelFrame(top, text= 'appearance')
         appearance_frame.grid(row=0,column= 0)
 
+        button_frame = tkinter.Frame(top)
+        button_frame.grid(row=1,column=0)
+
+        vcmd = (appearance_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+
         tkinter.Label(appearance_frame,text='background color:').grid(row=0,column=0)
-        custom_color_button = tkinter.Button(appearance_frame,text='',bg = _from_rgb(self.custom_color) ,command=lambda: get_color(custom_color_button))
-        custom_color_button.grid(row=0,column=1)
-        tkinter.Label(appearance_frame,text='background color:').grid(row=1,column=0)
-        grid_color_button = tkinter.Button(appearance_frame,text='',bg = _from_rgb(self.gridcolor) ,command=lambda: get_color(grid_color_button))
-        grid_color_button.grid(row=1,column=1)
-        button = tkinter.Button(top, text="Dismiss", command=top.destroy)
-        button.grid(row=2,column=0)
+        custom_color_button = tkinter.Button(appearance_frame,text='',bg = self.custom_color ,command=lambda: get_color(custom_color_button), width=10)
+        custom_color_button.grid(row=0,column=1,sticky=tkinter.E)
+        tkinter.Label(appearance_frame,text='grid color:').grid(row=1,column=0)
+        grid_color_button = tkinter.Button(appearance_frame,text='',bg = self.gridcolor ,command=lambda: get_color(grid_color_button), width=10)
+        grid_color_button.grid(row=1,column=1,sticky=tkinter.E)
+        tkinter.Label(appearance_frame,text='text color:').grid(row=2,column=0)
+        text_color_button = tkinter.Button(appearance_frame,text='',bg = self.text_color ,command=lambda: get_color(text_color_button), width=10)
+        text_color_button.grid(row=2,column=1,sticky=tkinter.E)
+        tkinter.Label(appearance_frame,text='pane color:').grid(row=3,column=0)
+        pane_color_button = tkinter.Button(appearance_frame,text='',bg = self.pane_color ,command=lambda: get_color(pane_color_button), width=10)
+        pane_color_button.grid(row=3,column=1,sticky=tkinter.E)
+
+        tkinter.Label(appearance_frame,text='textsize:').grid(row=4,column=0,sticky=tkinter.W)
+        tkinter.Entry(appearance_frame, validate='key', validatecommand = vcmd,textvariable=textsize_var).grid(row=4,column=1,sticky=tkinter.E)
+
+        dismiss_button = tkinter.Button(button_frame, text="cancel", command=top.destroy)
+        dismiss_button.grid(row=0,column=0)
+        accept_button = tkinter.Button(button_frame, text="save and apply", command = lambda: self.update_config_vars(custom_color_button,grid_color_button,text_color_button,pane_color_button,textsize_var.get()))
+        accept_button.grid(row=0,column=1)
+        default_button = tkinter.Button(button_frame, text='default colors', command = lambda: self.set_default_colors(redraw=True,buttons =[custom_color_button,grid_color_button,text_color_button,pane_color_button] ))
+        default_button.grid(row=0,column=3)
+        top.resizable(width=False,height=False)
         top.attributes('-topmost',1)
+
+    def update_config_vars(self,custom_color_button,grid_color_button,text_color_button,pane_color_button,textsize_var):
+        self.custom_color = custom_color_button.cget('bg')
+        self.gridcolor = grid_color_button.cget('bg')
+        self.text_color = text_color_button.cget('bg')
+        self.pane_color = pane_color_button.cget('bg')
+        self.textsize = float(textsize_var)
+        self.update_config()
+        self.redraw_current_objects()
 
     def annotate3D(self,ax, s, *args, **kwargs):
         '''add anotation text s to to Axes3d ax'''
@@ -322,10 +374,10 @@ class plot_application:
         self.equinox_artists = []
         xlim = self.ax.get_xlim()
         length = 0.15 *xlim[1]
-        self.equinox_artists.append(self.ax.plot([0,length] , [0,0],[0,0],color='white',linewidth=self.refplane_linewidth))
-        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,0.05*length],[0,0.05*length],color='white',linewidth=self.refplane_linewidth))
-        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,-0.05*length],[0,-0.05*length],color='white',linewidth=self.refplane_linewidth))
-        self.equinox_artists.append(self.annotate3D(self.ax, s='vernal equinox', xyz=[length,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white'))
+        self.equinox_artists.append(self.ax.plot([0,length] , [0,0],[0,0],color=self.text_color,linewidth=self.refplane_linewidth))
+        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,0.05*length],[0,0.05*length],color=self.text_color,linewidth=self.refplane_linewidth))
+        self.equinox_artists.append(self.ax.plot([length,0.7*length],[0,-0.05*length],[0,-0.05*length],color=self.text_color,linewidth=self.refplane_linewidth))
+        self.equinox_artists.append(self.annotate3D(self.ax, s='vernal equinox', xyz=[length,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = self.text_color))
         self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
 
     def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
@@ -410,12 +462,15 @@ class plot_application:
         objects = [self.JPL_name2num[object] for object in objects]
         self.objects.extend(objects)
         orbits,positions = self.request_keplers(objects,self.batchfile)
-        self.current_objects['orbits'].extend(orbits)
-        self.current_objects['positions'].extend(positions)
-        artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,objects,refresh_canvas = True, clear_axis=clear_axis,refplane_var=self.refplane_var.get())
-        self.current_objects['artists'].extend(artists)
-        self.current_objects['colors'].extend(colors)
-        self.current_objects['dates'].extend(dates)
+        if orbits == False:
+            pass
+        else:
+            self.current_objects['orbits'].extend(orbits)
+            self.current_objects['positions'].extend(positions)
+            artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,objects,refresh_canvas = True, clear_axis=clear_axis,refplane_var=self.refplane_var.get())
+            self.current_objects['artists'].extend(artists)
+            self.current_objects['colors'].extend(colors)
+            self.current_objects['dates'].extend(dates)
 
 
     def plot_orbits(self,ax,orbits,positions,objects,refresh_canvas=True,clear_axis = True,refplane_var = 1,colors=None,saved_dates=None):
@@ -427,20 +482,27 @@ class plot_application:
         dates = []
         if clear_axis:
             self.ax.cla()
+
+            plt.rcParams['savefig.facecolor']= self.custom_color
+            plt.rcParams['grid.color'] = self.gridcolor
+            plt.rcParams['grid.linewidth'] = self.gridlinewidth
+            self.fig.set(facecolor = self.custom_color)
+            self.ax.set(facecolor = self.custom_color)
+
             ax.scatter(0,0,0,marker='o',s = 20,color='yellow')
             self.annotate3D(ax, s='sun', xyz=[0,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color ="white")
             ax.set_xlabel('X axis in km')
             ax.set_ylabel('Y axis in km')
             ax.set_zlabel('Z axis in km')
-            ax.xaxis.label.set_color('white')
-            ax.yaxis.label.set_color('white')
-            ax.zaxis.label.set_color('white')
-            ax.tick_params(axis='x', colors='white')
-            ax.tick_params(axis='y', colors='white')
-            ax.tick_params(axis='z', colors='white')
-            ax.w_xaxis.set_pane_color((0, 0, 0, .6))
-            ax.w_yaxis.set_pane_color((0, 0, 0, .6))
-            ax.w_zaxis.set_pane_color((0, 0, 0, .6))
+            ax.xaxis.label.set_color(self.text_color)
+            ax.yaxis.label.set_color(self.text_color)
+            ax.zaxis.label.set_color(self.text_color)
+            ax.tick_params(axis='x', colors=self.text_color)
+            ax.tick_params(axis='y', colors=self.text_color)
+            ax.tick_params(axis='z', colors=self.text_color)
+            ax.w_xaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
+            ax.w_yaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
+            ax.w_zaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
         index = 0
         for orbit in orbits:
             if None in orbit:
@@ -458,9 +520,9 @@ class plot_application:
 
             marker_artists.append(self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5,label =str(self.JPL_numbers[object]) ))
             dates.append(self.dt)
-            self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = 'white',clip_on=False)
+            self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = self.text_color,clip_on=False)
             if self.annot_var.get() == 1:
-                self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = 'white',clip_on=False)
+                self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = self.text_color,clip_on=False)
             index = index + 1
 
         # # # recompute the ax.dataLim
@@ -490,11 +552,15 @@ class plot_application:
         if refresh_canvas:
             self.canvas.draw()
         return marker_artists,orbit_colors,dates
+
     def on_closing(self):
         if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
             self.master.quit()
 
-    def request_keplers(self,objects,batchfile):
+    def error_message(self,title,message):
+        tkinter.messagebox.showerror(title,message)
+
+    def request_keplers(self,objects,batchfile,errors=0):
         print('requesting keplers for selected items')
         orbits = []
         positions = []
@@ -506,7 +572,15 @@ class plot_application:
             batchfile['COMMAND'] = object
             self.dt = self.calendar_widget.selection_get()
             batchfile['TLIST'] = "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
-            r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile)
+            try:
+                r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile,timeout=2.0)
+            except (requests.exceptions.ConnectionError,requests.exceptions.Timeout):
+                print('connection failed, retrying...')
+                if errors<=2:
+                    return self.request_keplers(objects,batchfile,errors = errors+1)
+                self.error_message('Connection Error','Could not reach the Server, please check your internet connection.')
+                return False,False
+
             print(r.text)
             count = count + 1
             self.prog_bar["value"] = count
@@ -560,14 +634,14 @@ class plot_application:
             self.ax.set_axis_off()
             self.canvas.draw()
 
-    def toggle_refplane(self):
+    def redraw_current_objects(self):
         self.plot_orbits(self.ax,self.current_objects['orbits'],self.current_objects['positions'],self.objects,refplane_var=self.refplane_var.get(),saved_dates = self.current_objects['dates'],colors = self.current_objects['colors'])
 
     def toggle_proj(self):
         if self.proj_var.get() == 1:
             self.ax.set_proj_type('persp')
         else:
-            self.ax.set_proj_type('ortho')#
+            self.ax.set_proj_type('ortho')
         self.canvas.draw()
 
     def clicked_on(self,event):
