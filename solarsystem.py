@@ -20,6 +20,7 @@ import csv
 import configparser,ast
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.ticker import ScalarFormatter
 # Implement the appearance Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
 from tkcalendar import DateEntry,Calendar
@@ -69,12 +70,13 @@ class plot_application:
         self.check_config()
 
         self.view_cid = 0
+        self.formatter = ScalarFormatter(useMathText=True,useOffset=True)
         self.dt = datetime.datetime.now()
         self.dates = []
         self.julian_date =  "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
         self.order_of_keplers = ['excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance','sidereal_period']
         self.objects = ["'399'","'499'","'-143205'"] #earth,mars,Tesla roadster, ... ceres : ,"'5993'"
-        self.batchfile = {"COMMAND": "'399'","CENTER": "'500@10'","MAKE_EPHEM": "'YES'","TABLE_TYPE": "'ELEMENTS'","TLIST":self.julian_date,"OUT_UNITS": "'KM-S'","REF_PLANE": "'ECLIPTIC'","REF_SYSTEM": "'J2000'","TP_TYPE": "'ABSOLUTE'","ELEM_LABELS": "'YES'","CSV_FORMAT": "'YES'","OBJ_DATA": "'YES'"}
+        self.batchfile = {"COMMAND": "'399'","CENTER": "'500@10'","MAKE_EPHEM": "'YES'","TABLE_TYPE": "'ELEMENTS'","TLIST":self.julian_date,"OUT_UNITS": "'AU-D'","REF_PLANE": "'ECLIPTIC'","REF_SYSTEM": "'J2000'","TP_TYPE": "'ABSOLUTE'","ELEM_LABELS": "'YES'","CSV_FORMAT": "'YES'","OBJ_DATA": "'YES'"}
         self.my_file = Path("./"+self.filename+'.pkl')
         self.my_file2 = Path("./"+self.filename2+'.csv')
         self.search_term = tkinter.StringVar()
@@ -84,18 +86,23 @@ class plot_application:
         self.check_db()
 
         self.fig = plt.figure(facecolor = self.custom_color)
+        self.fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99)
         self.master.wm_title("JPL horizons DB visualisation")
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)  # A tk.DrawingArea.
+        self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
         self.canvas.get_tk_widget().bind('<ButtonPress-1>',self.canvas_mouseturn,add='+')
         self.canvas.get_tk_widget().bind('<ButtonPress-3>',self.canvas_mousezoom,add='+')
         self.canvas.get_tk_widget().bind('<ButtonRelease-3>',self.canvas_mouserelease,add='+')
         self.canvas.get_tk_widget().bind('<ButtonRelease-1>',self.canvas_mouserelease,add='+')
-        self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
+
         self.canvas.get_tk_widget().config(cursor=self.cursor)
+
         plt.rcParams['savefig.facecolor']= self.custom_color
         plt.rcParams['grid.color'] = self.gridcolor
         plt.rcParams['grid.linewidth'] = self.gridlinewidth
+
         self.ax = self.fig.gca(projection = '3d',facecolor =  self.custom_color,proj_type = 'ortho')
+
         self.canvas.get_tk_widget().grid(row=0,column=0,columnspan=10,rowspan=10,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         self.viewbuttons_frame = tkinter.Frame(master= self.canvas.get_tk_widget())
         self.viewbuttons_frame.place(rely=1,relx=0,anchor=tkinter.SW)
@@ -491,9 +498,9 @@ class plot_application:
 
             ax.scatter(0,0,0,marker='o',s = 20,color='yellow')
             self.annotate3D(ax, s='sun', xyz=[0,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color ="white")
-            ax.set_xlabel('X axis in km')
-            ax.set_ylabel('Y axis in km')
-            ax.set_zlabel('Z axis in km')
+            ax.set_xlabel('X axis in AU')
+            ax.set_ylabel('Y axis in AU')
+            ax.set_zlabel('Z axis in AU')
             ax.xaxis.label.set_color(self.text_color)
             ax.yaxis.label.set_color(self.text_color)
             ax.zaxis.label.set_color(self.text_color)
@@ -538,6 +545,11 @@ class plot_application:
         self.ax.set_ylim([-max, max])
         self.ax.set_xlim([-max, max])
         self.ax.set_zlim([-max, max])
+
+        # self.formatter.set_scientific(True)
+        # self.ax.xaxis.set_major_formatter(self.formatter)
+        # self.ax.yaxis.set_major_formatter(self.formatter)
+
         # self.scale_equinox(None)
         # ylim = self.ax.get_ylim()
         # xlim = self.ax.get_xlim()
