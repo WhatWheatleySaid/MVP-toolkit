@@ -183,6 +183,7 @@ class plot_application:
             Annotation.draw(self, renderer)
 
     def set_default_colors(self,redraw=False,buttons=None):
+        '''sets colors to default, if buttons handed over: colors them accordingly'''
         self.custom_color =  self.default_colors[0]
         self.gridcolor = self.default_colors[1]
         self.text_color = self.default_colors[2]
@@ -195,6 +196,7 @@ class plot_application:
                 counter = counter + 1
 
     def check_config(self):
+        '''check if config exists, makes default config if not'''
         file = Path("./config.ini")
         config = configparser.ConfigParser()
         if file.is_file():
@@ -218,6 +220,7 @@ class plot_application:
             self.update_config()
 
     def update_config(self):
+        '''update configfile with current memory variables'''
         config = configparser.ConfigParser()
         config['appearance'] = \
         {\
@@ -240,12 +243,14 @@ class plot_application:
         self.canvas.get_tk_widget().config(cursor=self.cursor)
 
     def hex_to_rgb(self,h,alpha=1):
+        '''takes hex color code and returns rgb-alpha tuple'''
         h = h.strip('#')
         h = tuple(int(h[i:i+2], 16) for i in (0, 2 ,4))
         h = (h[0]/255,h[1]/255,h[2]/255,alpha)
         return h
 
     def save_file_as(self):
+        '''saves figure (currently redraws figure and toggles visibility of axis to true)'''
         dir = filedialog.asksaveasfilename(defaultextension=".png")
         if dir == '' or dir == ():
             return
@@ -261,7 +266,7 @@ class plot_application:
         # img.save(dir)
 
     def preferences_menu(self):
-
+        '''toplevel menu to adjust config file'''
         def validate(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
             if text in '0123456789.-+':
                 try:
@@ -322,6 +327,7 @@ class plot_application:
         top.attributes('-topmost',1)
 
     def update_config_vars(self,custom_color_button,grid_color_button,text_color_button,pane_color_button,textsize_var):
+        '''get colors of preference buttons, update config file and redraw figure with new colors'''
         self.custom_color = custom_color_button.cget('bg')
         self.gridcolor = grid_color_button.cget('bg')
         self.text_color = text_color_button.cget('bg')
@@ -345,6 +351,7 @@ class plot_application:
         return np.array([[np.cos(rho),-np.sin(rho),0],[np.sin(rho),np.cos(rho),0],[0,0,1]])
 
     def change_view(self,view):
+        '''sets the view angles of the plot and toggles visibility of the perpendicular axis to false until plot is moved/refreshed   '''
         if view == "top":
             self.ax.view_init(90,-90)
             self.axis_visibility(event = None,axis='z',visible=False)
@@ -371,6 +378,7 @@ class plot_application:
 
 
     def scale_equinox(self,event):
+        '''function to draw a scaling vector-arrow on the x-axis(equinox)'''
         self.fig.canvas.mpl_disconnect(self.equinox_cid)
         if len(self.equinox_artists)>0:
             for i in range(0,len(self.equinox_artists)):
@@ -446,10 +454,12 @@ class plot_application:
                         # Fatal Python Error: PyEval_RestoreThread: NULL tstate
 
     def sort_vals(self,dictionary):
+        '''sort dictionary values'''
         sorted_x = sorted(dictionary.items(), key=operator.itemgetter(1))
         return dict(sorted_x)
 
     def get_selected(self):
+        '''get selected items from listbox'''
         user_choice = []
         index_list = map(int,self.listbox.curselection())
         for i in index_list:
@@ -457,6 +467,7 @@ class plot_application:
         return user_choice
 
     def refresh_plot(self,clear_axis = True):
+        '''new plot, dismisses existing objects'''
         print('refreshing')
         if clear_axis:
             self.current_objects['orbits'] = []
@@ -481,6 +492,7 @@ class plot_application:
 
 
     def plot_orbits(self,ax,orbits,positions,objects,refresh_canvas=True,clear_axis = True,refplane_var = 1,colors=None,saved_dates=None):
+        '''plots orbits, positions and annotations'''
         orbit_colors = []
         if colors != None:
             orbit_colors = colors
@@ -570,9 +582,11 @@ class plot_application:
             self.master.quit()
 
     def error_message(self,title,message):
+        '''generates an error message-popup with generic title and message'''
         tkinter.messagebox.showerror(title,message)
 
     def request_keplers(self,objects,batchfile,errors=0):
+        '''requests kepler elements from HORIZONS-batch-interface for objects'''
         print('requesting keplers for selected items')
         orbits = []
         positions = []
@@ -627,6 +641,7 @@ class plot_application:
         return orbits,positions
 
     def update_listbox(self):
+        '''update listbox according to search term'''
         search_term = self.search_term.get()
         selected_items = self.get_selected()
         self.listbox.delete(0,tkinter.END)
@@ -647,6 +662,7 @@ class plot_application:
             self.canvas.draw()
 
     def redraw_current_objects(self):
+        '''just redrawing the plot to accept user changes to appearance'''
         self.plot_orbits(self.ax,self.current_objects['orbits'],self.current_objects['positions'],self.objects,refplane_var=self.refplane_var.get(),saved_dates = self.current_objects['dates'],colors = self.current_objects['colors'])
 
     def toggle_proj(self):
@@ -657,6 +673,7 @@ class plot_application:
         self.canvas.draw()
 
     def clicked_on(self,event):
+        '''takes pick event of object'''
         # artist_dir = dir(event.artist)
         # pprint(arist_dir)
         name= event.artist.get_label()
@@ -669,6 +686,7 @@ class plot_application:
 
 
     def check_db(self):
+        '''checks if DB file exists, if not, queries HORIZONS socket service to extract major bodies'''
         if not self.my_file.is_file():
             #telnet session to extract Major Bodies dict
 
