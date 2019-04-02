@@ -74,7 +74,7 @@ class plot_application:
         self.text_yoffset = 4
         self.check_config()
 
-        self.view_cid = 0
+        self.view_cid = None
         self.formatter = ScalarFormatter(useMathText=True,useOffset=True)
         self.dt = datetime.datetime.now()
         self.dates = []
@@ -94,7 +94,7 @@ class plot_application:
         self.fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99)
         self.master.wm_title("JPL horizons DB visualisation")
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)  # A tk.DrawingArea.
-        self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
+        self.pick_event_cid = self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
         self.canvas.get_tk_widget().bind('<ButtonPress-1>',self.canvas_mouseturn,add='+')
         self.canvas.get_tk_widget().bind('<ButtonPress-3>',self.canvas_mousezoom,add='+')
         self.canvas.get_tk_widget().bind('<ButtonRelease-3>',self.canvas_mouserelease,add='+')
@@ -270,6 +270,12 @@ class plot_application:
         # img = Image.open(io.BytesIO(ps.encode('utf-8')))
         # img.save(dir)
 
+    def get_color(self,b):
+        color=askcolor(b.cget('bg'))
+        if None in color:
+            return
+        b.configure(bg=color[1])
+
     def preferences_menu(self):
         '''toplevel menu to adjust config file'''
         def validate(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
@@ -281,12 +287,6 @@ class plot_application:
                     return False
             else:
                 return False
-
-        def get_color(b):
-            color=askcolor(b.cget('bg'))
-            if None in color:
-                return
-            b.configure(bg=color[1])
 
         top = tkinter.Toplevel()
 
@@ -307,16 +307,16 @@ class plot_application:
         vcmd = (appearance_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
 
         tkinter.Label(appearance_frame,text='background color:').grid(row=0,column=0)
-        custom_color_button = tkinter.Button(appearance_frame,text='',bg = self.custom_color ,command=lambda: get_color(custom_color_button), width=10)
+        custom_color_button = tkinter.Button(appearance_frame,text='',bg = self.custom_color ,command=lambda: self.get_color(custom_color_button), width=10)
         custom_color_button.grid(row=0,column=1,sticky=tkinter.E)
         tkinter.Label(appearance_frame,text='grid color:').grid(row=1,column=0)
-        grid_color_button = tkinter.Button(appearance_frame,text='',bg = self.gridcolor ,command=lambda: get_color(grid_color_button), width=10)
+        grid_color_button = tkinter.Button(appearance_frame,text='',bg = self.gridcolor ,command=lambda: self.get_color(grid_color_button), width=10)
         grid_color_button.grid(row=1,column=1,sticky=tkinter.E)
         tkinter.Label(appearance_frame,text='text color:').grid(row=2,column=0)
-        text_color_button = tkinter.Button(appearance_frame,text='',bg = self.text_color ,command=lambda: get_color(text_color_button), width=10)
+        text_color_button = tkinter.Button(appearance_frame,text='',bg = self.text_color ,command=lambda: self.get_color(text_color_button), width=10)
         text_color_button.grid(row=2,column=1,sticky=tkinter.E)
         tkinter.Label(appearance_frame,text='pane color:').grid(row=3,column=0)
-        pane_color_button = tkinter.Button(appearance_frame,text='',bg = self.pane_color ,command=lambda: get_color(pane_color_button), width=10)
+        pane_color_button = tkinter.Button(appearance_frame,text='',bg = self.pane_color ,command=lambda: self.get_color(pane_color_button), width=10)
         pane_color_button.grid(row=3,column=1,sticky=tkinter.E)
 
         tkinter.Label(appearance_frame,text='textsize:').grid(row=4,column=0,sticky=tkinter.W)
@@ -358,28 +358,34 @@ class plot_application:
     def change_view(self,view):
         '''sets the view angles of the plot and toggles visibility of the perpendicular axis to false until plot is moved/refreshed   '''
         if view == "top":
+            self.axis_visibility(event = None,axis='z',visible=False) #produces clicking on artist beeing unresponsive
             self.ax.view_init(90,-90)
-            self.axis_visibility(event = None,axis='z',visible=False)
             self.view_cid = self.fig.canvas.mpl_connect('draw_event',lambda event: self.axis_visibility(event,axis='z',visible=True))
         elif view == "XZ":
+            self.axis_visibility(event = None,axis='y',visible=False) #produces clicking on artist beeing unresponsives
             self.ax.view_init(0,-90)
-            self.axis_visibility(event = None,axis='y',visible=False)
             self.view_cid = self.fig.canvas.mpl_connect('draw_event',lambda event: self.axis_visibility(event,axis='y',visible=True))
         elif view == "XYZ":
             self.ax.view_init(45,-45)
         self.canvas.draw()
 
+
     def axis_visibility(self,event,axis,visible):
         if axis == 'z':
             self.ax.set_zticklabels(self.ax.get_zticklabels(),visible=visible)
             self.ax.set_zlabel(self.ax.get_zlabel(),visible=visible)
+            # if visible:
+            #     self.ax.tick_params(axis='z', colors=self.text_color)
+            # else:
+            #     self.ax.tick_params(axis='z', colors=self.custom_color)
         elif axis == 'y':
             self.ax.set_yticklabels(self.ax.get_yticklabels(),visible=visible)
             self.ax.set_ylabel(self.ax.get_ylabel(),visible=visible)
         elif axis == 'x':
             self.ax.set_xticklabels(self.ax.get_xticklabels(),visible=visible)
             self.ax.set_xlabel(self.ax.get_xlabel(),visible=visible)
-        self.fig.canvas.mpl_disconnect(self.view_cid)
+        if self.view_cid != None:
+            self.fig.canvas.mpl_disconnect(self.view_cid)
 
 
     def scale_equinox(self,event):
@@ -688,7 +694,43 @@ class plot_application:
             object.position_artist[0].set_markeredgecolor(object.position_artist[0].get_markerfacecolor())
         selected_object.position_artist[0].set_markeredgecolor('white')
         self.canvas.draw()
+        self.artist_menu(selected_object)
 
+    def artist_menu(self,object):
+        top = tkinter.Toplevel()
+
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title("{0} parameters".format(object.displayname))
+
+        displayname_var = tkinter.StringVar()
+        displayname_var.set(str(object.displayname))
+        settings_frame =  tkinter.LabelFrame(top, text= 'object parameters')
+        settings_frame.grid(row=0,column= 0)
+
+        button_frame = tkinter.Frame(top)
+        button_frame.grid(row=1,column=0)
+
+        tkinter.Label(settings_frame,text='object color:').grid(row=0,column=0,sticky=tkinter.W)
+        artist_color_button = tkinter.Button(settings_frame,text='',bg = object.color ,command=lambda: self.get_color(artist_color_button), width=10)
+        artist_color_button.grid(row=0,column=1,sticky=tkinter.E)
+
+        tkinter.Label(settings_frame,text='displayname:').grid(row=2,column=0,sticky=tkinter.W)
+        tkinter.Entry(settings_frame,textvariable=displayname_var).grid(row=2,column=1,sticky=tkinter.E)
+
+        dismiss_button = tkinter.Button(button_frame, text="cancel", command=top.destroy)
+        dismiss_button.grid(row=0,column=0)
+        accept_button = tkinter.Button(button_frame, text="apply changes", command = lambda: self.update_artist(object,artist_color_button,displayname_var.get(),top))
+        accept_button.grid(row=0,column=1)
+        top.resizable(width=False,height=False)
+        top.attributes('-topmost',1)
+
+    def update_artist(self,object,artist_color_button,displayname,top):
+        object.color = artist_color_button.cget('bg')
+        object.displayname = displayname
+        self.redraw_current_objects()
+        top.destroy()
 
     def check_db(self):
         '''checks if DB file exists, if not, queries HORIZONS socket service to extract major bodies'''
