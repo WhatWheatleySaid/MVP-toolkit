@@ -15,6 +15,7 @@ from pathlib import Path
 import pickle
 import tkinter
 from tkinter.colorchooser import *
+from tkinter import ttk
 import operator
 import csv
 import configparser,ast
@@ -270,8 +271,8 @@ class plot_application:
         # img = Image.open(io.BytesIO(ps.encode('utf-8')))
         # img.save(dir)
 
-    def get_color(self,b):
-        color=askcolor(b.cget('bg'))
+    def get_color(self,b,parent):
+        color=askcolor(b.cget('bg'),parent=parent)
         if None in color:
             return
         b.configure(bg=color[1])
@@ -307,16 +308,16 @@ class plot_application:
         vcmd = (appearance_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
 
         tkinter.Label(appearance_frame,text='background color:').grid(row=0,column=0,sticky=tkinter.W)
-        custom_color_button = tkinter.Button(appearance_frame,text='',bg = self.custom_color ,command=lambda: self.get_color(custom_color_button), width=10)
+        custom_color_button = tkinter.Button(appearance_frame,text='',bg = self.custom_color ,command=lambda: self.get_color(custom_color_button,top), width=10)
         custom_color_button.grid(row=0,column=1,sticky=tkinter.E)
         tkinter.Label(appearance_frame,text='grid color:').grid(row=1,column=0,sticky=tkinter.W)
-        grid_color_button = tkinter.Button(appearance_frame,text='',bg = self.gridcolor ,command=lambda: self.get_color(grid_color_button), width=10)
+        grid_color_button = tkinter.Button(appearance_frame,text='',bg = self.gridcolor ,command=lambda: self.get_color(grid_color_button,top), width=10)
         grid_color_button.grid(row=1,column=1,sticky=tkinter.E)
         tkinter.Label(appearance_frame,text='text color:').grid(row=2,column=0,sticky=tkinter.W)
-        text_color_button = tkinter.Button(appearance_frame,text='',bg = self.text_color ,command=lambda: self.get_color(text_color_button), width=10)
+        text_color_button = tkinter.Button(appearance_frame,text='',bg = self.text_color ,command=lambda: self.get_color(text_color_button,top), width=10)
         text_color_button.grid(row=2,column=1,sticky=tkinter.E)
         tkinter.Label(appearance_frame,text='pane color:').grid(row=3,column=0,sticky=tkinter.W)
-        pane_color_button = tkinter.Button(appearance_frame,text='',bg = self.pane_color ,command=lambda: self.get_color(pane_color_button), width=10)
+        pane_color_button = tkinter.Button(appearance_frame,text='',bg = self.pane_color ,command=lambda: self.get_color(pane_color_button,top), width=10)
         pane_color_button.grid(row=3,column=1,sticky=tkinter.E)
 
         tkinter.Label(appearance_frame,text='textsize:').grid(row=4,column=0,sticky=tkinter.W)
@@ -329,7 +330,7 @@ class plot_application:
         default_button = tkinter.Button(button_frame, text='default colors', command = lambda: self.set_default_colors(redraw=True,buttons =[custom_color_button,grid_color_button,text_color_button,pane_color_button] ))
         default_button.grid(row=0,column=3)
         top.resizable(width=False,height=False)
-        top.attributes('-topmost',1)
+        top.transient(self.master)
 
     def update_config_vars(self,custom_color_button,grid_color_button,text_color_button,pane_color_button,textsize_var):
         '''get colors of preference buttons, update config file and redraw figure with new colors'''
@@ -689,7 +690,6 @@ class plot_application:
                 name= object.name
                 selected_object = object
                 pprint('clicked {0}'.format(name))
-        print(selected_object.info_text)
         for object in self.current_objects:
             object.position_artist[0].set_markeredgecolor(object.position_artist[0].get_markerfacecolor())
         selected_object.position_artist[0].set_markeredgecolor('white')
@@ -702,34 +702,52 @@ class plot_application:
         x = root.winfo_x()
         y = root.winfo_y()
         top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("{0} parameters".format(object.displayname))
+        top.title("{0}".format(object.displayname))
 
+
+        tabcontrol = ttk.Notebook(top)
+        parameters_tab = ttk.Frame(tabcontrol)
+        info_text_tab = ttk.Frame(tabcontrol)
+        tabcontrol.add(parameters_tab, text = 'object parameters')
+        tabcontrol.add(info_text_tab, text = 'DB information')
+        tabcontrol.grid(row=0,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
+
+        button_frame = ttk.Frame(top)
+        button_frame.grid(row=1,column=0)
         displayname_var = tkinter.StringVar()
         displayname_var.set(str(object.displayname))
-        settings_frame =  tkinter.LabelFrame(top, text= 'object parameters')
-        settings_frame.grid(row=0,column= 0)
 
-        button_frame = tkinter.Frame(top)
-        button_frame.grid(row=1,column=0)
 
-        tkinter.Label(settings_frame,text='object color:').grid(row=0,column=0,sticky=tkinter.W)
-        artist_color_button = tkinter.Button(settings_frame,text='',bg = object.color ,command=lambda: self.get_color(artist_color_button), width=10)
-        artist_color_button.grid(row=0,column=1,sticky=tkinter.E)
+        info_text_widget = tkinter.Text(info_text_tab)
+        info_text_widget.insert(tkinter.END,object.info_text)
+        info_text_widget.config(state=tkinter.DISABLED)
+        info_text_widget.grid(row=0,column=0)
+        settings_frame =  tkinter.LabelFrame(parameters_tab, text= 'parameters')
+        settings_frame.grid(row=0,column= 0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
 
-        tkinter.Label(settings_frame,text='displayname:').grid(row=2,column=0,sticky=tkinter.W)
-        tkinter.Entry(settings_frame,textvariable=displayname_var).grid(row=2,column=1,sticky=tkinter.E)
+        tkinter.Label(settings_frame,text='object color:').grid(row=0,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
+        artist_color_button = tkinter.Button(settings_frame,text='',bg = object.color ,command=lambda: self.get_color(artist_color_button,top), width=10)
+        artist_color_button.grid(row=0,column=1,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
 
-        dismiss_button = tkinter.Button(button_frame, text="cancel", command=top.destroy)
+        tkinter.Label(settings_frame,text='displayname:').grid(row=2,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
+        tkinter.Entry(settings_frame,textvariable=displayname_var).grid(row=2,column=1,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
+
+        dismiss_button = tkinter.Button(button_frame, text="cancel", command=lambda: self.destroy_toplevel(top))
         dismiss_button.grid(row=0,column=0)
         accept_button = tkinter.Button(button_frame, text="apply changes", command = lambda: self.update_artist(object,artist_color_button,displayname_var.get(),top))
         accept_button.grid(row=0,column=1)
         top.resizable(width=False,height=False)
-        top.attributes('-topmost',1)
+        top.transient(self.master)
+
+    def destroy_toplevel(self,top):
+        self.master.deiconify()
+        top.destroy()
 
     def update_artist(self,object,artist_color_button,displayname,top):
         object.color = artist_color_button.cget('bg')
         object.displayname = displayname
         self.redraw_current_objects()
+        self.master.deiconify()
         top.destroy()
 
     def check_db(self):
@@ -783,6 +801,10 @@ class plot_application:
 
 if __name__ == '__main__':
     root = tkinter.Tk()
+    '''Icons made by "https://www.freepik.com/" from "https://www.flaticon.com/"
+    www.flaticon.com is licensed by "http://creativecommons.org/licenses/by/3.0/"'''
+    icon_img = tkinter.Image("photo",file='./galaxy.png')
+    root.tk.call('wm','iconphoto',root._w,icon_img)
     tkinter.Grid.rowconfigure(root, 0, weight=1)
     tkinter.Grid.columnconfigure(root, 0, weight=1)
     gui = plot_application(root)
