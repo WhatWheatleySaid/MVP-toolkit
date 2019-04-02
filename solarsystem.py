@@ -28,14 +28,18 @@ from tkinter import filedialog
 # import io
 # from PIL import Image
 
-# class celestial_artist:
-#     def __init__(self,id,artist,orbit,pos,date,color):
-#         self.id = id
-#         self.artist = artist
-#         self.orbit = orbit
-#         self.pos = pos
-#         self.date = date
-#         self.color = color
+class celestial_artist:
+    def __init__(self,id,orbit,pos,date,name):
+        self.id = id
+        self.orbit_artist = None
+        self.position_artist = None
+        self.annotation_artist = None
+        self.orbit = orbit
+        self.pos = pos
+        self.date = date
+        self.color = None
+        self.name = name
+        self.displayname = name
 
 class plot_application:
     def __init__(self, master):
@@ -55,7 +59,7 @@ class plot_application:
         self.orbit_colors = []
         self.equinox_artists = []
         self.list = []
-        self.current_objects = {}
+        self.current_objects = []
 
         self.default_colors = ['#191919','#7f7f7f','#ffffff','#000000']
         self.resolution = 80
@@ -160,11 +164,11 @@ class plot_application:
         if orbits == False:
             pass
         else:
-            self.current_objects = {'orbits':orbits,'positions':positions}
-            artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,self.objects,refresh_canvas=True,refplane_var=self.refplane_var.get())
-            self.current_objects['dates'] = dates
-            self.current_objects['colors'] = colors
-            self.current_objects['artists'] = artists
+            # self.current_objects = {'orbits':orbits,'positions':positions}
+            self.plot_orbits(self.ax,self.current_objects,refresh_canvas=True,refplane_var=self.refplane_var.get())
+            # self.current_objects['dates'] = dates
+            # self.current_objects['colors'] = colors
+            # self.current_objects['artists'] = artists
 
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -405,7 +409,7 @@ class plot_application:
             r = np.matmul(self.rot_x(i),r)
             r = np.matmul(self.rot_z(Omega),r)
         elif e <=1:
-            # e = 1 atually wrong, here just to prevent crash
+            # e = 1 atually wrong, here just to prevent crash, exact excentricity of 1 should not happen
             p = a * (1-(e**2))
             r = p/(1+e*np.cos(self.nu))
             r = np.array([np.multiply(r,np.cos(self.nu)) , np.multiply(r,np.sin(self.nu)), np.zeros(len(self.nu))])
@@ -470,11 +474,7 @@ class plot_application:
         '''new plot, dismisses existing objects'''
         print('refreshing')
         if clear_axis:
-            self.current_objects['orbits'] = []
-            self.current_objects['positions'] = []
-            self.current_objects['dates'] = []
-            self.current_objects['colors'] = []
-            self.current_objects['artists'] = []
+            self.current_objects = []
             self.objects = []
         objects = self.get_selected()
         objects = [self.JPL_name2num[object] for object in objects]
@@ -483,66 +483,56 @@ class plot_application:
         if orbits == False:
             pass
         else:
-            self.current_objects['orbits'].extend(orbits)
-            self.current_objects['positions'].extend(positions)
-            artists,colors,dates = self.plot_orbits(self.ax,orbits,positions,objects,refresh_canvas = True, clear_axis=clear_axis,refplane_var=self.refplane_var.get())
-            self.current_objects['artists'].extend(artists)
-            self.current_objects['colors'].extend(colors)
-            self.current_objects['dates'].extend(dates)
+            self.plot_orbits(self.ax,self.current_objects,refresh_canvas = True,refplane_var=self.refplane_var.get())
 
 
-    def plot_orbits(self,ax,orbits,positions,objects,refresh_canvas=True,clear_axis = True,refplane_var = 1,colors=None,saved_dates=None):
+
+    def plot_orbits(self,ax,objects,refresh_canvas=True,refplane_var = 1):
         '''plots orbits, positions and annotations'''
-        orbit_colors = []
-        if colors != None:
-            orbit_colors = colors
 
-        marker_artists = []
-        dates = []
-        if clear_axis:
-            self.ax.cla()
+        self.ax.cla()
 
-            plt.rcParams['savefig.facecolor']= self.custom_color
-            plt.rcParams['grid.color'] = self.gridcolor
-            plt.rcParams['grid.linewidth'] = self.gridlinewidth
-            self.fig.set(facecolor = self.custom_color)
-            self.ax.set(facecolor = self.custom_color)
+        plt.rcParams['savefig.facecolor']= self.custom_color
+        plt.rcParams['grid.color'] = self.gridcolor
+        plt.rcParams['grid.linewidth'] = self.gridlinewidth
+        self.fig.set(facecolor = self.custom_color)
+        self.ax.set(facecolor = self.custom_color)
 
-            ax.scatter(0,0,0,marker='o',s = 20,color='yellow')
-            self.annotate3D(ax, s='sun', xyz=[0,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color ="white")
-            ax.set_xlabel('X axis in AU')
-            ax.set_ylabel('Y axis in AU')
-            ax.set_zlabel('Z axis in AU')
-            ax.xaxis.label.set_color(self.text_color)
-            ax.yaxis.label.set_color(self.text_color)
-            ax.zaxis.label.set_color(self.text_color)
-            ax.tick_params(axis='x', colors=self.text_color)
-            ax.tick_params(axis='y', colors=self.text_color)
-            ax.tick_params(axis='z', colors=self.text_color)
-            ax.w_xaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
-            ax.w_yaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
-            ax.w_zaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
-        index = 0
-        for orbit in orbits:
-            if None in orbit:
+        ax.scatter(0,0,0,marker='o',s = 20,color='yellow')
+        self.annotate3D(ax, s='sun', xyz=[0,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color ="white")
+        ax.set_xlabel('X axis in AU')
+        ax.set_ylabel('Y axis in AU')
+        ax.set_zlabel('Z axis in AU')
+        ax.xaxis.label.set_color(self.text_color)
+        ax.yaxis.label.set_color(self.text_color)
+        ax.zaxis.label.set_color(self.text_color)
+        ax.tick_params(axis='x', colors=self.text_color)
+        ax.tick_params(axis='y', colors=self.text_color)
+        ax.tick_params(axis='z', colors=self.text_color)
+        ax.w_xaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
+        ax.w_yaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
+        ax.w_zaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
+
+        for object in objects:
+            if None in object.orbit:
                 continue
-            ph = ax.plot(orbit[0],orbit[1],orbit[2],linewidth=self.orbit_linewidth,clip_on=False)
+            orbit = object.orbit
+            pos = object.pos
+            if object.color == None:
+                object.orbit_artist = ax.plot(orbit[0],orbit[1],orbit[2],linewidth=self.orbit_linewidth,clip_on=False)
+            else:
+                object.orbit_artist = ax.plot(orbit[0],orbit[1],orbit[2],color=object.color,linewidth=self.orbit_linewidth,clip_on=False)
             if refplane_var == 1:
-                for x,y,z in zip(*orbit.tolist()):
-                    ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
-            orbit_colors.append(ph[0].get_color())
-        for pos, object in zip(positions,objects):
-            if None in pos:
-                continue
-            if not(saved_dates == None):
-                self.dt = saved_dates[index]
+                     for x,y,z in zip(*object.orbit.tolist()):
+                         ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
 
-            marker_artists.append(self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=orbit_colors[index],markeredgecolor = orbit_colors[index],clip_on=False,picker=5,label =str(self.JPL_numbers[object]) ))
-            dates.append(self.dt)
-            self.annotate3D(ax, s=self.JPL_numbers[object], xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = self.text_color,clip_on=False)
+            color = object.orbit_artist[0].get_color()
+            object.color = color
+
+            object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=color ,markeredgecolor = color ,clip_on=False,picker=5)
+            object.annotation_artist = self.annotate3D(ax, s=object.displayname, xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = self.text_color,clip_on=False)
             if self.annot_var.get() == 1:
-                self.annotate3D(ax, s=str(self.dt), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = self.text_color,clip_on=False)
-            index = index + 1
+                self.annotate3D(ax, s=str(object.date), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = self.text_color,clip_on=False)
 
         # # # recompute the ax.dataLim
         # # ax.relim()
@@ -575,7 +565,7 @@ class plot_application:
 
         if refresh_canvas:
             self.canvas.draw()
-        return marker_artists,orbit_colors,dates
+        return # marker_artists,orbit_colors,dates
 
     def on_closing(self):
         if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
@@ -607,20 +597,26 @@ class plot_application:
                 self.error_message('Connection Error','Could not reach the Server, please check your internet connection.')
                 return False,False
 
-            print(r.text)
+            # print(r.text)
             count = count + 1
             self.prog_bar["value"] = count
             self.prog_bar.update()
             if 'No ephemeris for target' in r.text:
                 print('No ephemeris for target{0} at date {1}'.format(self.JPL_numbers[object],self.dt))
+                orbit = [None,None]
+                position = [None,None]
                 orbits.append([None,None])
                 positions.append([None,None])
             elif 'is out of bounds, no action taken' in r.text:
                 print('{0} is out of bounds, no action taken (couldnt find {1} in batch interface of JPL horizonss)'.format(self.JPL_numbers[object],object))
+                orbit = [None,None]
+                position = [None,None]
                 orbits.append([None,None])
                 positions.append([None,None])
             elif 'No such record, positive values only' in r.text:
                 print('No record for {0}({1}), positive values only'.format(object,self.JPL_numbers[object]))
+                orbit = [None,None]
+                position = [None,None]
                 orbits.append([None,None])
                 positions.append([None,None])
             else:
@@ -636,8 +632,13 @@ class plot_application:
                 self.kepler_dict['true_anomaly'] = np.deg2rad(self.kepler_dict['true_anomaly'])
                 print('\n\n{0}:\n'.format(self.JPL_numbers[object]))
                 pprint(self.kepler_dict)
-                orbits.append(self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega']))
-                positions.append(self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega'],[self.kepler_dict['true_anomaly']]))
+                orbit = self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega'])
+                position = self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega'],[self.kepler_dict['true_anomaly']])
+                orbits.append(orbit)
+                positions.append(position)
+
+            '''celestial artist : def __init__(self,id,artist,orbit,pos,date,color,name):'''
+            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object]))
         return orbits,positions
 
     def update_listbox(self):
@@ -663,7 +664,7 @@ class plot_application:
 
     def redraw_current_objects(self):
         '''just redrawing the plot to accept user changes to appearance'''
-        self.plot_orbits(self.ax,self.current_objects['orbits'],self.current_objects['positions'],self.objects,refplane_var=self.refplane_var.get(),saved_dates = self.current_objects['dates'],colors = self.current_objects['colors'])
+        self.plot_orbits(self.ax,self.current_objects,refplane_var=self.refplane_var.get())
 
     def toggle_proj(self):
         if self.proj_var.get() == 1:
@@ -674,10 +675,13 @@ class plot_application:
 
     def clicked_on(self,event):
         '''takes pick event of object'''
-        # artist_dir = dir(event.artist)
-        # pprint(arist_dir)
-        name= event.artist.get_label()
-        pprint('clicked {0}'.format(name))
+         # artist_dir = dir(event.artist)
+         # pprint(arist_dir)
+        for object in self.current_objects:
+            if object.position_artist[0].get_label() == event.artist.get_label():
+                name= object.name
+                pprint('clicked {0}'.format(name))
+
         if event.artist.get_markeredgecolor() =='white':
             event.artist.set_markeredgecolor(event.artist.get_markerfacecolor())
         else:
