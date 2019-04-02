@@ -736,8 +736,23 @@ class plot_application:
         dismiss_button.grid(row=0,column=0)
         accept_button = tkinter.Button(button_frame, text="apply changes", command = lambda: self.update_artist(object,artist_color_button,displayname_var.get(),top))
         accept_button.grid(row=0,column=1)
+        remove_button = tkinter.Button(button_frame, text="remove this from plot", command = lambda: self.remove_artist(object,top))
+        remove_button.grid(row=0,column=2)
         top.resizable(width=False,height=False)
         top.transient(self.master)
+
+    def remove_artist(self,object,top):
+        object.position_artist[0].remove()
+        object.orbit_artist[0].remove()
+        object.annotation_artist.remove()
+        index = 0
+        for obj in self.current_objects:
+            if obj.position_artist[0].get_label() == object.position_artist[0].get_label():
+                self.current_objects.pop(index)
+                break
+            index = index + 1
+        self.redraw_current_objects()
+        top.destroy()
 
     def destroy_toplevel(self,top):
         self.master.deiconify()
