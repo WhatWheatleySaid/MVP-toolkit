@@ -306,16 +306,16 @@ class plot_application:
 
         vcmd = (appearance_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
 
-        tkinter.Label(appearance_frame,text='background color:').grid(row=0,column=0)
+        tkinter.Label(appearance_frame,text='background color:').grid(row=0,column=0,sticky=tkinter.W)
         custom_color_button = tkinter.Button(appearance_frame,text='',bg = self.custom_color ,command=lambda: self.get_color(custom_color_button), width=10)
         custom_color_button.grid(row=0,column=1,sticky=tkinter.E)
-        tkinter.Label(appearance_frame,text='grid color:').grid(row=1,column=0)
+        tkinter.Label(appearance_frame,text='grid color:').grid(row=1,column=0,sticky=tkinter.W)
         grid_color_button = tkinter.Button(appearance_frame,text='',bg = self.gridcolor ,command=lambda: self.get_color(grid_color_button), width=10)
         grid_color_button.grid(row=1,column=1,sticky=tkinter.E)
-        tkinter.Label(appearance_frame,text='text color:').grid(row=2,column=0)
+        tkinter.Label(appearance_frame,text='text color:').grid(row=2,column=0,sticky=tkinter.W)
         text_color_button = tkinter.Button(appearance_frame,text='',bg = self.text_color ,command=lambda: self.get_color(text_color_button), width=10)
         text_color_button.grid(row=2,column=1,sticky=tkinter.E)
-        tkinter.Label(appearance_frame,text='pane color:').grid(row=3,column=0)
+        tkinter.Label(appearance_frame,text='pane color:').grid(row=3,column=0,sticky=tkinter.W)
         pane_color_button = tkinter.Button(appearance_frame,text='',bg = self.pane_color ,command=lambda: self.get_color(pane_color_button), width=10)
         pane_color_button.grid(row=3,column=1,sticky=tkinter.E)
 
