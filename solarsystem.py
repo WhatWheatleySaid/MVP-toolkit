@@ -29,7 +29,7 @@ from tkinter import filedialog
 # from PIL import Image
 
 class celestial_artist:
-    def __init__(self,id,orbit,pos,date,name):
+    def __init__(self,id,orbit,pos,date,name,text):
         self.id = id
         self.orbit_artist = None
         self.position_artist = None
@@ -40,6 +40,7 @@ class celestial_artist:
         self.color = None
         self.name = name
         self.displayname = name
+        self.info_text = text
 
 class plot_application:
     def __init__(self, master):
@@ -638,7 +639,7 @@ class plot_application:
                 positions.append(position)
 
             '''celestial artist : def __init__(self,id,artist,orbit,pos,date,color,name):'''
-            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object]))
+            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text))
         return orbits,positions
 
     def update_listbox(self):
@@ -680,12 +681,12 @@ class plot_application:
         for object in self.current_objects:
             if object.position_artist[0].get_label() == event.artist.get_label():
                 name= object.name
+                selected_object = object
                 pprint('clicked {0}'.format(name))
-
-        if event.artist.get_markeredgecolor() =='white':
-            event.artist.set_markeredgecolor(event.artist.get_markerfacecolor())
-        else:
-            event.artist.set_markeredgecolor('white')
+        print(selected_object.info_text)
+        for object in self.current_objects:
+            object.position_artist[0].set_markeredgecolor(object.position_artist[0].get_markerfacecolor())
+        selected_object.position_artist[0].set_markeredgecolor('white')
         self.canvas.draw()
 
 
