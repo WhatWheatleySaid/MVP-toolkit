@@ -829,7 +829,7 @@ class plot_application:
         self.JPL_numbers = self.sort_vals(self.JPL_numbers)
         self.JPL_name2num = dict((v,k) for k,v in self.JPL_numbers.items())
 
-    def solve_lambert(self,r1,r2,delta_t,numiters=100,tolerance=1e-14):
+    def solve_lambert(self,r1,r2,delta_t,numiters=100,tolerance=1e-6):
         ''' solve lambert problem for a single resolution and return v1,v2 and keplers of orbit
             self.GM_sun is G times mass of centerbody
 
@@ -844,7 +844,7 @@ class plot_application:
             return X
 
         a_min = s/2
-        a_max = 2*s
+        a_max = s*2
         a = 0.5*(a_min+a_max)
 
         # print('a:{0}\nc:{1}\ns:{2}\nsun_GM:{3}\nsqrt(s/2*a):{4}\nnp.sqrt((s-c)/2*a):{5}\n'.format(a,c,s,self.GM_sun,np.sqrt(s/(2*a)),np.sqrt((s-c)/2*a)))
@@ -871,7 +871,7 @@ class plot_application:
             a = 0.5*(a_min+a_max)
 
             #did converge
-            if np.abs((tof-delta_t)/delta_t) <= tolerance:
+            if np.abs((tof-delta_t)) <= tolerance:
                 break
             iter = iter + 1
 
@@ -895,36 +895,37 @@ class plot_application:
         r1 = [val for sublist in r1 for val in sublist]
         r2 = [val for sublist in r2 for val in sublist]
 
-        #test:
+        # test:
         # a = np.linalg.norm(r1)/(2-np.linalg.norm(r1)* np.dot(v_1,v_1))
-
-        print('r1: {0}\n v1: {1}\n\n'.format(r1,v_1))
-        h = np.cross(r1,v_1)
-        W = h / np.linalg.norm(h)
-        # inclination = np.arctan2(W[2],np.sqrt(W[0]**2 + W[1]**2) ) #should be right
-        inclination = np.arctan2(np.sqrt(W[0]**2 + W[1]**2), W[2] )
-        # Omega = np.arctan2(-W[1],W[0]) #should be right
-        Omega = np.arctan2(W[0],-W[1])
-        ecc = np.sqrt(1 - ( (np.linalg.norm(h)**2) / (self.GM_sun*a) ))
-
-        print('ecc: {0}\nh: {1}\ngm*a:{2}\ngm:{3}\na:{4}\n\n'.format(ecc,h,self.GM_sun*a,self.GM_sun,a))
-
-        # anomaly_ecc = np.arctan2(1- (np.linalg.norm(r2)/a) , (np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))) ) #should be right
-        anomaly_ecc = np.arctan2((np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))),1- (np.linalg.norm(r2)/a) )
-        # u = np.arctan2(h[0] * np.cos(Omega) + h[1] * np.sin(Omega) , h[2]/np.sin(inclination)) #should be right
-
-        u = np.arctan2(W[2]/np.sin(inclination),W[0] * np.cos(Omega) + W[1] * np.sin(Omega))
-        u = u - np.pi/2
-        # u = np.arctan((W[2]/np.sin(inclination)) / (W[0] * np.cos(Omega) + W[1] * np.sin(Omega)))
-        # anomaly_true = np.arctan2(np.cos(anomaly_ecc)-ecc , np.sqrt(1-ecc**2) * np.sin(anomaly_ecc)) #should be right
-        anomaly_true = np.arctan2(np.sqrt(1-ecc**2) * np.sin(anomaly_ecc) , np.cos(anomaly_ecc)-ecc)
-        omega = u - anomaly_true
-
-        if Omega <0 :
-            Omega = Omega +2*np.pi
-        if omega <0 :
-            omega = omega +2*np.pi
-        keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':anomaly_true,'a':a}
+        #
+        # print('r1: {0}\n v1: {1}\n\n'.format(r1,v_1))
+        # h = np.cross(r1,v_1)
+        # W = h / np.linalg.norm(h)
+        # # inclination = np.arctan2(W[2],np.sqrt(W[0]**2 + W[1]**2) ) #should be right
+        # inclination = np.arctan2(np.sqrt(W[0]**2 + W[1]**2), W[2] )
+        # # Omega = np.arctan2(-W[1],W[0]) #should be right
+        # Omega = np.arctan2(W[0],-W[1])
+        # ecc = np.sqrt(1 - ( (np.linalg.norm(h)**2) / (self.GM_sun*a) ))
+        #
+        # print('ecc: {0}\nh: {1}\ngm*a:{2}\ngm:{3}\na:{4}\n\n'.format(ecc,h,self.GM_sun*a,self.GM_sun,a))
+        #
+        # # anomaly_ecc = np.arctan2(1- (np.linalg.norm(r2)/a) , (np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))) ) #should be right
+        # anomaly_ecc = np.arctan2((np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))),1- (np.linalg.norm(r2)/a) )
+        # # u = np.arctan2(h[0] * np.cos(Omega) + h[1] * np.sin(Omega) , h[2]/np.sin(inclination)) #should be right
+        #
+        # u = np.arctan2(W[2]/np.sin(inclination),W[0] * np.cos(Omega) + W[1] * np.sin(Omega))
+        # u = u - np.pi/2
+        # # u = np.arctan((W[2]/np.sin(inclination)) / (W[0] * np.cos(Omega) + W[1] * np.sin(Omega)))
+        # # anomaly_true = np.arctan2(np.cos(anomaly_ecc)-ecc , np.sqrt(1-ecc**2) * np.sin(anomaly_ecc)) #should be right
+        # anomaly_true = np.arctan2(np.sqrt(1-ecc**2) * np.sin(anomaly_ecc) , np.cos(anomaly_ecc)-ecc)
+        # omega = u - anomaly_true
+        #
+        # if Omega <0 :
+        #     Omega = Omega +2*np.pi
+        # if omega <0 :
+        #     omega = omega +2*np.pi
+        ecc, inclination, Omega, omega, true_anomaly = self.kart2kep(r2,v_2)
+        keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':true_anomaly,'a':a}
         return v_1, v_2, keplers
 
     def calc_rendezvous(self,selection1,selection2):
@@ -961,21 +962,26 @@ class plot_application:
 
         return
 
-    # def kart2kep(self,r,v):
-    #     r_norm = np.linalg.norm(r)
-    #     v_norm_vector = v / (np.sqrt(self.G*self.M_sun))
-    #     L = np.cross(r,v_norm_vector)
-    #     inclination =  np.arctan2(np.sqrt(L[0]**2 + L[1]**2) , L[2])
-    #     Omega = np.arctan2(L[0],-L[1])
-    #     if Omega < 0:
-    #         Omega = Omega+2*np.pi
-    #     Z = ((np.cross(v_norm_vector,L)/(self.M_sun)) - r/r_norm )
-    #     ecc = np.linalg.norm(Z)
-    #     N = np.abs(L[2]) * np.array([-L[1] , L[0] , 0])
-    #     H = np.cross(L,N)
-    #     omega = np.arctan2(np.linalg.norm(N) * np.dot(Z,H), np.linalg.norm(H) * np.dot(Z,N))
-    #
-    #     return ecc, inclination, Omega, omega
+    def kart2kep(self,r,v):
+        h = np.cross(r,v)
+        ecc_vector = (np.cross(v,h)/self.GM_sun) - (r/np.linalg.norm(r))
+        ecc = np.linalg.norm(ecc_vector)
+        n = np.array([ -h[1] , h[0] , 0 ])
+        if np.dot(r,v) >= 0:
+            true_anomaly = np.arccos(np.dot(ecc_vector,r)/(np.linalg.norm(ecc_vector)*np.linalg.norm(r)))
+        else:
+            true_anomaly = 2*np.pi - np.arccos(np.dot(ecc_vector,r)/(np.linalg.norm(ecc_vector)*np.linalg.norm(r)))
+        inclination = np.arccos(h[2]/np.linalg.norm(h))
+        if n[1] >=0:
+            Omega = np.arccos(n[0]/np.linalg.norm(n))
+        else:
+            Omega = 2*np.pi - np.arccos(n[0]/np.linalg.norm(n))
+        if ecc_vector[2] >= 0:
+            omega = np.arccos(np.dot(n,ecc_vector)/(np.linalg.norm(n)*np.linalg.norm(ecc_vector)))
+        else:
+            omega = np.arccos(np.dot(n,ecc_vector)/(np.linalg.norm(n)*np.linalg.norm(ecc_vector)))
+
+        return ecc, inclination, Omega, omega, true_anomaly
 
     def lambert_menu(self):
         choice_1_var = tkinter.StringVar()
