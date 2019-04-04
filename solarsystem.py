@@ -19,6 +19,7 @@ from tkinter import ttk
 import operator
 import csv
 import configparser,ast
+# from pykep import lambert_problem
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.ticker import ScalarFormatter
@@ -30,7 +31,7 @@ from tkinter import filedialog
 # from PIL import Image
 
 class celestial_artist:
-    def __init__(self,id,orbit,pos,date,name,text):
+    def __init__(self,id,orbit,pos,date,name,text,keplers):
         self.id = id
         self.orbit_artist = None
         self.position_artist = None
@@ -43,9 +44,15 @@ class celestial_artist:
         self.displayname = name
         self.info_text = text
 
+        self.keplers = keplers
+
 class plot_application:
     def __init__(self, master):
         self.master = master
+        self.AUinKM = 149597870.691
+        self.G = 6.673e-20 / np.power(self.AUinKM,3) #km³/kg*s²
+        self.GM_sun = 1.3271244018e11 / np.power(self.AUinKM,3)
+        self.M_sun = self.GM_sun / self.G
         self.index = 0
         self.kepler_dict = {}
         self.planet_positions = []
@@ -117,12 +124,17 @@ class plot_application:
 
         self.menubar = tkinter.Menu(self.master)
         self.filemenu = tkinter.Menu(self.menubar,tearoff = 0)
+
         self.filemenu.add_command(label="save figure as", command=self.save_file_as)
         self.filemenu.add_command(label="preferences", command=self.preferences_menu)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.master.quit)
-        self.menubar.add_cascade(label='File',menu=self.filemenu)
 
+        self.tools_menu = tkinter.Menu(self.menubar,tearoff = 0)
+        self.tools_menu.add_command(label='calculate rendezvous (lambert solver)', command=self.lambert_menu)
+
+        self.menubar.add_cascade(label='File',menu=self.filemenu)
+        self.menubar.add_cascade(label='Tools',menu=self.tools_menu)
         self.master.config(menu=self.menubar)
 
         self.button1 = tkinter.Button(master=self.master, text="new Plot", command=lambda : self.refresh_plot(True))
@@ -479,7 +491,7 @@ class plot_application:
         return user_choice
 
     def refresh_plot(self,clear_axis = True):
-        '''new plot, dismisses existing objects'''
+        '''new plot, dismisses existing objects if clear_axis == True'''
         print('refreshing')
         if clear_axis:
             self.current_objects = []
@@ -536,8 +548,10 @@ class plot_application:
 
             color = object.orbit_artist[0].get_color()
             object.color = color
-
-            object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=color ,markeredgecolor = color ,clip_on=False,picker=5)
+            if object.id == None:
+                object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='*', MarkerSize=self.markersize,MarkerFaceColor=color ,markeredgecolor = color ,clip_on=False,picker=5)
+            else:
+                object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=color ,markeredgecolor = color ,clip_on=False,picker=5)
             object.annotation_artist = self.annotate3D(ax, s=object.displayname, xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = self.text_color,clip_on=False)
             if self.annot_var.get() == 1:
                 self.annotate3D(ax, s=str(object.date), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = self.text_color,clip_on=False)
@@ -638,15 +652,15 @@ class plot_application:
                 self.kepler_dict['inclination'] = np.deg2rad(self.kepler_dict['inclination'])
                 self.kepler_dict['omega'] = np.deg2rad(self.kepler_dict['omega'])
                 self.kepler_dict['true_anomaly'] = np.deg2rad(self.kepler_dict['true_anomaly'])
-                print('\n\n{0}:\n'.format(self.JPL_numbers[object]))
-                pprint(self.kepler_dict)
+                # print('\n\n{0}:\n'.format(self.JPL_numbers[object]))
+                # pprint(self.kepler_dict)
                 orbit = self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega'])
                 position = self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega'],[self.kepler_dict['true_anomaly']])
                 orbits.append(orbit)
                 positions.append(position)
 
             '''celestial artist : def __init__(self,id,artist,orbit,pos,date,color,name):'''
-            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text))
+            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,self.kepler_dict))
         return orbits,positions
 
     def update_listbox(self):
@@ -740,6 +754,7 @@ class plot_application:
         remove_button.grid(row=0,column=2)
         top.resizable(width=False,height=False)
         top.transient(self.master)
+        root.tk.call('wm','iconphoto',top._w,icon_img)
 
     def remove_artist(self,object,top):
         object.position_artist[0].remove()
@@ -813,6 +828,249 @@ class plot_application:
         self.JPL_numbers = dict((k,v) for k,v in self.JPL_numbers.items() if not (v==''))
         self.JPL_numbers = self.sort_vals(self.JPL_numbers)
         self.JPL_name2num = dict((v,k) for k,v in self.JPL_numbers.items())
+
+    def solve_lambert(self,r1,r2,delta_t,numiters=100,tolerance=1e-14):
+        ''' solve lambert problem for a single resolution and return v1,v2 and keplers of orbit
+            self.GM_sun is G times mass of centerbody
+
+        '''
+        r1 = np.array(r1)
+        r2 = np.array(r2)
+        c = np.linalg.norm(r1-r2)
+        s = 0.5*(c +np.linalg.norm(r1) + np.linalg.norm(r2))
+
+        def lambert_rhs(a):
+            X = np.sqrt(a**3 / self.GM_sun) * ( 2*np.arcsin(np.sqrt(s/(2*a))) - 2*np.arcsin(np.sqrt((s-c)/(2*a))) - np.sin(2*np.arcsin(np.sqrt(s/(2*a)))) + np.sin(2*np.arcsin(np.sqrt((s-c)/(2*a)))) )
+            return X
+
+        a_min = s/2
+        a_max = 2*s
+        a = 0.5*(a_min+a_max)
+
+        # print('a:{0}\nc:{1}\ns:{2}\nsun_GM:{3}\nsqrt(s/2*a):{4}\nnp.sqrt((s-c)/2*a):{5}\n'.format(a,c,s,self.GM_sun,np.sqrt(s/(2*a)),np.sqrt((s-c)/2*a)))
+
+        min_tof = (np.sqrt(2)/3)  * np.sqrt((s**3)/self.GM_sun) * ( 1 - (((s-c)/s)**(3/2)) )
+        max_tof = lambert_rhs(a_min)
+        if delta_t < min_tof:
+            print('time is to short')
+            self.error_message('error','time period is to short to make a elliptical transfer')
+            return False,False,False
+        if delta_t > max_tof:
+            print('time is to long')
+            self.error_message('error','time period is to long to make a elliptical transfer')
+            return False,False,False
+
+        iter = 0
+
+        while 1 :
+            tof = lambert_rhs(a)
+            if  tof < delta_t:
+                a_max = a
+            else:
+                a_min = a
+            a = 0.5*(a_min+a_max)
+
+            #did converge
+            if np.abs((tof-delta_t)/delta_t) <= tolerance:
+                break
+            iter = iter + 1
+
+            #did not converge
+            if iter == numiters or tof == 'nan':
+                print('did not converge')
+                self.error_message('error','lambert solver did not converge in {0} itterations'.format(numiters))
+                return False,False,False
+
+        coeff = 0.5*np.sqrt(self.GM_sun/a)
+        A = coeff * (1/np.tan(np.arcsin(np.sqrt(s/(2*a)))))
+        B = coeff * (1/np.tan(np.arcsin(np.sqrt((s-c)/(2*a)))))
+        print("A: {0}\nB: {1}\ncoeff: {2}\n\n".format(A,B,coeff))
+        u_1 = r1/np.linalg.norm(r1)
+        u_2 = r2/np.linalg.norm(r2)
+        u_c = (r2-r1)/c
+        v_1 = (B+A)*u_c + (B-A)*u_1
+        v_2 = (B+A)*u_c - (B-A)*u_2
+        v_1 = [val for sublist in v_1 for val in sublist]
+        v_2 = [val for sublist in v_2 for val in sublist]
+        r1 = [val for sublist in r1 for val in sublist]
+        r2 = [val for sublist in r2 for val in sublist]
+
+        #test:
+        # a = np.linalg.norm(r1)/(2-np.linalg.norm(r1)* np.dot(v_1,v_1))
+
+        print('r1: {0}\n v1: {1}\n\n'.format(r1,v_1))
+        h = np.cross(r1,v_1)
+        W = h / np.linalg.norm(h)
+        # inclination = np.arctan2(W[2],np.sqrt(W[0]**2 + W[1]**2) ) #should be right
+        inclination = np.arctan2(np.sqrt(W[0]**2 + W[1]**2), W[2] )
+        # Omega = np.arctan2(-W[1],W[0]) #should be right
+        Omega = np.arctan2(W[0],-W[1])
+        ecc = np.sqrt(1 - ( (np.linalg.norm(h)**2) / (self.GM_sun*a) ))
+
+        print('ecc: {0}\nh: {1}\ngm*a:{2}\ngm:{3}\na:{4}\n\n'.format(ecc,h,self.GM_sun*a,self.GM_sun,a))
+
+        # anomaly_ecc = np.arctan2(1- (np.linalg.norm(r2)/a) , (np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))) ) #should be right
+        anomaly_ecc = np.arctan2((np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))),1- (np.linalg.norm(r2)/a) )
+        # u = np.arctan2(h[0] * np.cos(Omega) + h[1] * np.sin(Omega) , h[2]/np.sin(inclination)) #should be right
+
+        u = np.arctan2(W[2]/np.sin(inclination),W[0] * np.cos(Omega) + W[1] * np.sin(Omega))
+        u = u - np.pi/2
+        # u = np.arctan((W[2]/np.sin(inclination)) / (W[0] * np.cos(Omega) + W[1] * np.sin(Omega)))
+        # anomaly_true = np.arctan2(np.cos(anomaly_ecc)-ecc , np.sqrt(1-ecc**2) * np.sin(anomaly_ecc)) #should be right
+        anomaly_true = np.arctan2(np.sqrt(1-ecc**2) * np.sin(anomaly_ecc) , np.cos(anomaly_ecc)-ecc)
+        omega = u - anomaly_true
+
+        if Omega <0 :
+            Omega = Omega +2*np.pi
+        if omega <0 :
+            omega = omega +2*np.pi
+        keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':anomaly_true,'a':a}
+        return v_1, v_2, keplers
+
+    def calc_rendezvous(self,selection1,selection2):
+        for object in self.current_objects:
+            if object.displayname == selection1:
+                object1 = object
+            if object.displayname == selection2:
+                object2 = object
+        # format = '%Y-%m-%d'
+        dt = object2.date -object1.date
+        if float(dt.total_seconds()) <=0:
+            self.error_message('error','you can only plan a rendezvous forward in time!')
+            return
+        dt = dt.total_seconds()
+        pos1 = object1.pos #* self.AUinKM
+        pos2 = object2.pos #* self.AUinKM
+        # pos1 = [val for sublist in pos1 for val in sublist]
+        # pos2 = [val for sublist in pos2 for val in sublist]
+
+        print('seconds: {0}\nr1: {1}\nr2: {2}\n\n'.format(dt,pos1,pos2))
+
+        v1,v2,keplers = self.solve_lambert(pos1,pos2,dt)
+        if v1 == False:
+            return
+        print('v1: {0}\nv2:{1}\nkeplers:{2}\n'.format(v1,v2,keplers))
+        #def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
+        orbit = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'])
+        pos = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],[keplers['true_anomaly'] + np.pi/2])
+        #class celestial_artist:
+            # def __init__(self,id,orbit,pos,date,name,text,keplers):
+        lambert_object = celestial_artist(None,orbit,pos,'0 rev.','Lambert solution','this is the 0 rev. solution to the Lambertproblem of:\n{0} -> {1}'.format(object1.displayname,object2.displayname),keplers)
+        self.current_objects.append(lambert_object)
+        self.redraw_current_objects()
+
+        return
+
+    # def kart2kep(self,r,v):
+    #     r_norm = np.linalg.norm(r)
+    #     v_norm_vector = v / (np.sqrt(self.G*self.M_sun))
+    #     L = np.cross(r,v_norm_vector)
+    #     inclination =  np.arctan2(np.sqrt(L[0]**2 + L[1]**2) , L[2])
+    #     Omega = np.arctan2(L[0],-L[1])
+    #     if Omega < 0:
+    #         Omega = Omega+2*np.pi
+    #     Z = ((np.cross(v_norm_vector,L)/(self.M_sun)) - r/r_norm )
+    #     ecc = np.linalg.norm(Z)
+    #     N = np.abs(L[2]) * np.array([-L[1] , L[0] , 0])
+    #     H = np.cross(L,N)
+    #     omega = np.arctan2(np.linalg.norm(N) * np.dot(Z,H), np.linalg.norm(H) * np.dot(Z,N))
+    #
+    #     return ecc, inclination, Omega, omega
+
+    def lambert_menu(self):
+        choice_1_var = tkinter.StringVar()
+        choice_2_var = tkinter.StringVar()
+
+        choice_list = []
+        for object in self.current_objects:
+            choice_list.append(object.displayname)
+        if len(choice_list) < 2:
+            self.error_message('error','there must be atleast 2 objects to plan a rendezvous')
+            return
+        choice_1_var.set(choice_list[0])
+        choice_2_var.set(choice_list[1])
+
+        top = tkinter.Toplevel(self.master)
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title("rendezvous tool")
+
+        dropdown_frame = tkinter.Frame(top)
+        button_frame = tkinter.Frame(top)
+        dropdown_frame.grid(row=0,column=0)
+        button_frame.grid(row=1,column=0)
+
+        choice_1 = tkinter.OptionMenu(dropdown_frame, choice_1_var, *choice_list)
+        choice_2 = tkinter.OptionMenu(dropdown_frame, choice_2_var, *choice_list)
+        tkinter.Label(dropdown_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
+        tkinter.Label(dropdown_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
+        choice_1.grid(row=0,column=1,sticky=tkinter.E)
+        choice_2.grid(row=1,column=1,sticky=tkinter.E)
+
+        close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
+        calculate_button = tkinter.Button(button_frame,text='calculate!',command=lambda : self.calc_rendezvous(choice_1_var.get(),choice_2_var.get()))
+        close_button.grid(row=0,column=0)
+        calculate_button.grid(row=0,column=1)
+        top.transient(self.master)
+        return
+
+#example for lambert solver using bisection method (checking for some additional cases)
+'''
+    def solve_lambert(k, r0, r, tof, short=True, numiter=35, rtol=1e-6):
+        if short:
+            t_m = +1
+        else:
+            t_m = -1
+
+        norm_r0 = np.dot(r0, r0)**.5
+        norm_r = np.dot(r, r)**.5
+        cos_dnu = np.dot(r0, r) / (norm_r0 * norm_r)
+        sin_dnu = t_m * (1 - cos_dnu ** 2)**.5
+
+        A = t_m * (norm_r * norm_r0 * (1 + cos_dnu))**.5
+
+        if A == 0.0:
+            raise RuntimeError("Cannot compute orbit")
+
+        psi = 0.0
+        psi_low = -4 * np.pi
+        psi_up = 4 * np.pi
+
+        count = 0
+        while count < numiter:
+            y = norm_r0 + norm_r + A * (psi * c3(psi) - 1) / c2(psi)**.5
+            if A > 0.0 and y < 0.0:
+                # Readjust xi_low until y > 0.0 (?)
+                pass
+            xi = np.sqrt(y / c2(psi))
+            tof_new = (xi**3 * c3(psi) + A * np.sqrt(y)) / np.sqrt(k)
+
+            # Convergence check
+            if np.abs((tof_new - tof) / tof) < rtol:
+                break
+            else:
+                count += 1
+                # Bisection check
+                if tof_new <= tof:
+                    psi_low = psi
+                else:
+                    psi_up = psi
+                psi = (psi_up + psi_low) / 2
+        else:
+            raise RuntimeError("Convergence could not be achieved under "
+                               "%d iterations" % numiter)
+
+        f = 1 - y / norm_r0
+        g = A * np.sqrt(y / k)
+
+        gdot = 1 - y / norm_r
+
+        v0 = (r - f * r0) / g
+        v = (gdot * r - r0) / g
+
+        return v0, v
+'''
 
 if __name__ == '__main__':
     root = tkinter.Tk()
