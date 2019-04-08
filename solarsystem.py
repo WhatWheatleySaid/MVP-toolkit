@@ -90,6 +90,8 @@ class plot_application:
         self.order_of_keplers = ['excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance','sidereal_period']
         self.objects = ["'399'","'499'","'-143205'"] #earth,mars,Tesla roadster, ... ceres : ,"'5993'"
         self.batchfile = {"COMMAND": "'399'","CENTER": "'500@10'","MAKE_EPHEM": "'YES'","TABLE_TYPE": "'ELEMENTS'","TLIST":self.julian_date,"OUT_UNITS": "'AU-D'","REF_PLANE": "'ECLIPTIC'","REF_SYSTEM": "'J2000'","TP_TYPE": "'ABSOLUTE'","ELEM_LABELS": "'YES'","CSV_FORMAT": "'YES'","OBJ_DATA": "'YES'"}
+        self.batchfile_timerange = {"COMMAND": "'399'","CENTER": "'500@10'","MAKE_EPHEM": "'YES'","TABLE_TYPE": "'VECTORS'","START_TIME": '',"STOP_TIME": '',"STEP_SIZE": '1 d',"OUT_UNITS": "'AU-D'","REF_PLANE": "'ECLIPTIC'","REF_SYSTEM": "'J2000'","VECT_CORR":"'NONE'","VEC_LABELS": "'NO'","VEC_DELTA_T": "'NO'","CSV_FORMAT": "'YES'","OBJ_DATA": "'NO'","VEC_TABLE": "'2'"}
+
         self.my_file = Path("./"+self.filename+'.pkl')
         self.my_file2 = Path("./"+self.filename2+'.csv')
         self.search_term = tkinter.StringVar()
@@ -830,7 +832,7 @@ class plot_application:
         self.JPL_numbers = self.sort_vals(self.JPL_numbers)
         self.JPL_name2num = dict((v,k) for k,v in self.JPL_numbers.items())
 
-    def solve_lambert(self,r1,r2,delta_t,object1,object2,numiters=100,tolerance=1e-6):
+    def solve_lambert(self,r1,r2,delta_t,object1,object2,numiters=100,tolerance=1e-6,popup = True):
         ''' solve lambert problem for a single resolution and return v1,v2 and keplers of orbit
             self.GM_sun is G times mass of centerbody
 
@@ -854,11 +856,13 @@ class plot_application:
         max_tof = lambert_rhs(a_min)
         if delta_t < min_tof:
             print('time is to short')
-            self.error_message('error','time period is to short to make a elliptical transfer')
+            if popup:
+                self.error_message('error','time period is to short to make a elliptical transfer')
             return False,False,False
         if delta_t > max_tof:
             print('time is to long')
-            self.error_message('error','time period is to long to make a elliptical transfer')
+            if popup:
+                self.error_message('error','time period is to long to make a elliptical transfer')
             return False,False,False
 
         iter = 0
@@ -879,7 +883,8 @@ class plot_application:
             #did not converge
             if iter == numiters or tof == 'nan':
                 print('did not converge')
-                self.error_message('error','lambert solver did not converge in {0} itterations'.format(numiters))
+                if popup:
+                    self.error_message('error','lambert solver did not converge in {0} itterations'.format(numiters))
                 return False,False,False
 
         coeff = 0.5*np.sqrt(self.GM_sun/a)
@@ -894,9 +899,12 @@ class plot_application:
         v_2 = [val for sublist in v_2 for val in sublist]
         r1 = [val for sublist in r1 for val in sublist]
         r2 = [val for sublist in r2 for val in sublist]
-
-        v_p1 = self.kep2velocity(object1)
-        v_p2 = self.kep2velocity(object2)
+        if popup:
+            v_p1 = self.kep2velocity(object1)
+            v_p2 = self.kep2velocity(object2)
+        else:
+            v_p1 = object1
+            v_p2 = object2
         # print('v_p1 : {0}\nv_p2 : {1}\n'.format(v_p1*self.AUinKM,v_p2*self.AUinKM))
         delta_v1 = np.linalg.norm(v_1 - v_p1)
         delta_v2 = np.linalg.norm(v_2 - v_p2)
@@ -1011,7 +1019,7 @@ class plot_application:
         return
 
     def calc_approx__timefree_dv(self,object1,object2, dt):
-
+        self.error_message('coming soon','function isnt implemented yet')
         return
 
     def approx_timefree_dv(self,r1,r2,dt,starting_object):
@@ -1033,8 +1041,23 @@ class plot_application:
         return
 
     def porkchop_menu(self):
+
+        def validate(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+            if text in '0123456789':
+                try:
+                    int(value_if_allowed)
+                    return True
+                except ValueError:
+                    return False
+            else:
+                return False
+
+        def Entry_Callback(event):
+            resolution_entry.selection_range(0, tkinter.END)
+
         choice_1_var = tkinter.StringVar()
         choice_2_var = tkinter.StringVar()
+        resolution_var = tkinter.StringVar()
 
         choice_list = []
         for object in self.current_objects:
@@ -1044,12 +1067,12 @@ class plot_application:
             return
         choice_1_var.set(choice_list[0])
         choice_2_var.set(choice_list[1])
-
+        resolution_var.set('1')
         top = tkinter.Toplevel(self.master)
         x = root.winfo_x()
         y = root.winfo_y()
         top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("rendezvous tool")
+        top.title("porkchop plot generator")
         top.rowconfigure(0, weight=1)
         top.columnconfigure(0, weight=1)
         dropdown_frame = tkinter.Frame(top)
@@ -1061,24 +1084,70 @@ class plot_application:
         info_frame.rowconfigure(0, weight=1)
 
         dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        vcmd = (dropdown_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         info_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
         button_frame.grid(row=2,column=0)
         choice_1 = tkinter.OptionMenu(dropdown_frame, choice_1_var, *choice_list)
         choice_2 = tkinter.OptionMenu(dropdown_frame, choice_2_var, *choice_list)
+        cal1 = DateEntry(dropdown_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
+        cal2 = DateEntry(dropdown_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+1, month=self.dt.month, day=self.dt.day)
+        resolution_entry = tkinter.Entry(dropdown_frame,validate = 'key', validatecommand=vcmd,textvariable=resolution_var)
+        resolution_entry.grid(row=2,column=2,sticky=tkinter.W)
+        resolution_entry.bind("<FocusIn>",Entry_Callback)
         tkinter.Label(dropdown_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
         tkinter.Label(dropdown_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
+        tkinter.Label(dropdown_frame, text='resolution in days:').grid(row=2,column=0,sticky=tkinter.W)
         choice_1.grid(row=0,column=1,sticky=tkinter.E)
         choice_2.grid(row=1,column=1,sticky=tkinter.E)
-
-        info_text_widget = tkinter.Label(info_frame,text = 'Attention: Always check for pausibillity of the solution!\n This tool can calculate a rendezvous between two\n points in space with an elliptical transfer. It uses a simple \nnumerical solver, especially at the lower\n and upper boundaries of possible solutions \nthe solver tends to shrink drastically in precision.')
-        info_text_widget.grid(row=0,column=0)
+        cal1.grid(row=0,column = 2)
+        cal2.grid(row=1,column = 2)
 
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='calculate!',command=lambda : self.calc_approx__timefree_dv(choice_1_var.get(),choice_2_var.get() , dt))
+        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date()))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
         top.transient(self.master)
         top.resizable(width=False,height=False)
+
+    def calc_porkchop(self,selection1,selection2,resolution,date1,date2):
+
+        print('to be implemented')
+        for object in self.current_objects:
+            if object.displayname == selection1:
+                object1 = object
+            if object.displayname == selection2:
+                object2 = object
+        vectors = self.request_vector_timerange(object1.id,date1,date2,resolution)
+        return
+
+    def request_vector_timerange(self,id,date1,date2,resolution,errors=0):
+
+        print(id)
+        print(date1)
+        print(date2)
+        print(resolution)
+        batchfile = self.batchfile_timerange
+        batchfile['COMMAND'] = str(id)
+        batchfile['START_TIME'] = "'"+str(date1)+"'"
+        batchfile['STOP_TIME'] = "'"+str(date2)+"'"
+        batchfile['STEP_SIZE'] = "'"+str(resolution) + " d'"
+
+        try:
+            r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile,timeout=2.0)
+        except (requests.exceptions.ConnectionError,requests.exceptions.Timeout):
+            print('connection failed, retrying...')
+            if errors<=2:
+                return self.request_vector_timerange(id,date1,date2,resolution,errors=errors+1)
+            self.error_message('Connection Error','Could not reach the Server, please check your internet connection.')
+            return False,False
+        # print(r.text)
+        vectors = r.text.split('$$SOE')[1].split('$$EOE')[0].replace(' ','').splitlines()
+        del vectors[0]
+        vectors = [vector.split(',') for vector in vectors]
+        pprint(vectors)
+        print(len(vectors))
+        print(len(vectors[0]))
+        return vectors
 
     def kep2velocity(self,object):
         ecc = object.keplers['excentricity']
