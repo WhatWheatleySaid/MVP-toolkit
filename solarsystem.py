@@ -49,7 +49,7 @@ class celestial_artist:
 class plot_application:
     def __init__(self, master):
         self.master = master
-        self.AUinKM = 149597870.691
+        self.AUinKM = 149597870.691 #km/AU
         self.G = 6.673e-20 / np.power(self.AUinKM,3) #km³/kg*s²
         self.GM_sun = 1.3271244018e11 / np.power(self.AUinKM,3)
         self.M_sun = self.GM_sun / self.G
@@ -132,6 +132,7 @@ class plot_application:
 
         self.tools_menu = tkinter.Menu(self.menubar,tearoff = 0)
         self.tools_menu.add_command(label='calculate rendezvous (lambert solver)', command=self.lambert_menu)
+        self.tools_menu.add_command(label='generate porkchop-plot', command=self.porkchop_menu)
 
         self.menubar.add_cascade(label='File',menu=self.filemenu)
         self.menubar.add_cascade(label='Tools',menu=self.tools_menu)
@@ -602,7 +603,7 @@ class plot_application:
         print('requesting keplers for selected items')
         orbits = []
         positions = []
-
+        kepler_dict = {}
         self.prog_bar["maximum"] = len(objects)
 
         count = 0
@@ -647,20 +648,20 @@ class plot_application:
                 del keplers[-1]
                 keplers = [float(element) for element in keplers]
                 for i in range(len(keplers)):
-                    self.kepler_dict[self.order_of_keplers[i]] = keplers[i]
-                self.kepler_dict['Omega'] = np.deg2rad(self.kepler_dict['Omega'])
-                self.kepler_dict['inclination'] = np.deg2rad(self.kepler_dict['inclination'])
-                self.kepler_dict['omega'] = np.deg2rad(self.kepler_dict['omega'])
-                self.kepler_dict['true_anomaly'] = np.deg2rad(self.kepler_dict['true_anomaly'])
+                    kepler_dict[self.order_of_keplers[i]] = keplers[i]
+                kepler_dict['Omega'] = np.deg2rad(kepler_dict['Omega'])
+                kepler_dict['inclination'] = np.deg2rad(kepler_dict['inclination'])
+                kepler_dict['omega'] = np.deg2rad(kepler_dict['omega'])
+                kepler_dict['true_anomaly'] = np.deg2rad(kepler_dict['true_anomaly'])
                 # print('\n\n{0}:\n'.format(self.JPL_numbers[object]))
-                # pprint(self.kepler_dict)
-                orbit = self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega'])
-                position = self.orbit_position(self.kepler_dict['a'],self.kepler_dict['excentricity'],self.kepler_dict['Omega'],self.kepler_dict['inclination'],self.kepler_dict['omega'],[self.kepler_dict['true_anomaly']])
+                # pprint(kepler_dict)
+                orbit = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'])
+                position = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'],[kepler_dict['true_anomaly']])
                 orbits.append(orbit)
                 positions.append(position)
 
             '''celestial artist : def __init__(self,id,artist,orbit,pos,date,color,name):'''
-            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,self.kepler_dict))
+            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,kepler_dict))
         return orbits,positions
 
     def update_listbox(self):
@@ -829,7 +830,7 @@ class plot_application:
         self.JPL_numbers = self.sort_vals(self.JPL_numbers)
         self.JPL_name2num = dict((v,k) for k,v in self.JPL_numbers.items())
 
-    def solve_lambert(self,r1,r2,delta_t,numiters=100,tolerance=1e-6):
+    def solve_lambert(self,r1,r2,delta_t,object1,object2,numiters=100,tolerance=1e-6):
         ''' solve lambert problem for a single resolution and return v1,v2 and keplers of orbit
             self.GM_sun is G times mass of centerbody
 
@@ -884,7 +885,6 @@ class plot_application:
         coeff = 0.5*np.sqrt(self.GM_sun/a)
         A = coeff * (1/np.tan(np.arcsin(np.sqrt(s/(2*a)))))
         B = coeff * (1/np.tan(np.arcsin(np.sqrt((s-c)/(2*a)))))
-        print("A: {0}\nB: {1}\ncoeff: {2}\n\n".format(A,B,coeff))
         u_1 = r1/np.linalg.norm(r1)
         u_2 = r2/np.linalg.norm(r2)
         u_c = (r2-r1)/c
@@ -895,38 +895,14 @@ class plot_application:
         r1 = [val for sublist in r1 for val in sublist]
         r2 = [val for sublist in r2 for val in sublist]
 
-        # test:
-        # a = np.linalg.norm(r1)/(2-np.linalg.norm(r1)* np.dot(v_1,v_1))
-        #
-        # print('r1: {0}\n v1: {1}\n\n'.format(r1,v_1))
-        # h = np.cross(r1,v_1)
-        # W = h / np.linalg.norm(h)
-        # # inclination = np.arctan2(W[2],np.sqrt(W[0]**2 + W[1]**2) ) #should be right
-        # inclination = np.arctan2(np.sqrt(W[0]**2 + W[1]**2), W[2] )
-        # # Omega = np.arctan2(-W[1],W[0]) #should be right
-        # Omega = np.arctan2(W[0],-W[1])
-        # ecc = np.sqrt(1 - ( (np.linalg.norm(h)**2) / (self.GM_sun*a) ))
-        #
-        # print('ecc: {0}\nh: {1}\ngm*a:{2}\ngm:{3}\na:{4}\n\n'.format(ecc,h,self.GM_sun*a,self.GM_sun,a))
-        #
-        # # anomaly_ecc = np.arctan2(1- (np.linalg.norm(r2)/a) , (np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))) ) #should be right
-        # anomaly_ecc = np.arctan2((np.linalg.norm(r2)*np.linalg.norm(v_2) / (a**2 * np.linalg.norm(W))),1- (np.linalg.norm(r2)/a) )
-        # # u = np.arctan2(h[0] * np.cos(Omega) + h[1] * np.sin(Omega) , h[2]/np.sin(inclination)) #should be right
-        #
-        # u = np.arctan2(W[2]/np.sin(inclination),W[0] * np.cos(Omega) + W[1] * np.sin(Omega))
-        # u = u - np.pi/2
-        # # u = np.arctan((W[2]/np.sin(inclination)) / (W[0] * np.cos(Omega) + W[1] * np.sin(Omega)))
-        # # anomaly_true = np.arctan2(np.cos(anomaly_ecc)-ecc , np.sqrt(1-ecc**2) * np.sin(anomaly_ecc)) #should be right
-        # anomaly_true = np.arctan2(np.sqrt(1-ecc**2) * np.sin(anomaly_ecc) , np.cos(anomaly_ecc)-ecc)
-        # omega = u - anomaly_true
-        #
-        # if Omega <0 :
-        #     Omega = Omega +2*np.pi
-        # if omega <0 :
-        #     omega = omega +2*np.pi
+        v_p1 = self.kep2velocity(object1)
+        v_p2 = self.kep2velocity(object2)
+        # print('v_p1 : {0}\nv_p2 : {1}\n'.format(v_p1*self.AUinKM,v_p2*self.AUinKM))
+        delta_v1 = np.linalg.norm(v_1 - v_p1)
+        delta_v2 = np.linalg.norm(v_2 - v_p2)
         ecc, inclination, Omega, omega, true_anomaly = self.kart2kep(r2,v_2)
         keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':true_anomaly,'a':a}
-        return v_1, v_2, keplers
+        return v_1, v_2, keplers, delta_v1, delta_v2
 
     def calc_rendezvous(self,selection1,selection2):
         for object in self.current_objects:
@@ -934,7 +910,7 @@ class plot_application:
                 object1 = object
             if object.displayname == selection2:
                 object2 = object
-        # format = '%Y-%m-%d'
+
         dt = object2.date -object1.date
         if float(dt.total_seconds()) <=0:
             self.error_message('error','you can only plan a rendezvous forward in time!')
@@ -942,21 +918,23 @@ class plot_application:
         dt = dt.total_seconds()
         pos1 = object1.pos #* self.AUinKM
         pos2 = object2.pos #* self.AUinKM
-        # pos1 = [val for sublist in pos1 for val in sublist]
-        # pos2 = [val for sublist in pos2 for val in sublist]
 
-        print('seconds: {0}\nr1: {1}\nr2: {2}\n\n'.format(dt,pos1,pos2))
+        v1,v2,keplers, delta_v1, delta_v2 = self.solve_lambert(pos1,pos2,dt,object1,object2)
 
-        v1,v2,keplers = self.solve_lambert(pos1,pos2,dt)
         if v1 == False:
             return
-        print('v1: {0}\nv2:{1}\nkeplers:{2}\n'.format(v1,v2,keplers))
+        # print('v1: {0}\nv2:{1}\nkeplers:{2}\n'.format(v1,v2,keplers))
         #def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
         orbit = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'])
         pos = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],[keplers['true_anomaly'] + np.pi/2])
+
+
         #class celestial_artist:
             # def __init__(self,id,orbit,pos,date,name,text,keplers):
-        lambert_object = celestial_artist(None,orbit,pos,'0 rev.','Lambert solution','this is the 0 rev. solution to the Lambertproblem of:\n{0} -> {1}'.format(object1.displayname,object2.displayname),keplers)
+        lambert_object = celestial_artist(None,orbit,pos,str(object1.date) + ' to ' + str(object2.date),'Lambert solution',
+        '*********\nthis is the 0 rev. solution to the Lambertproblem of the transfer from:\n{0} -> {1}\n\n*********\n'
+        'Delta V for Transferorbit as single pulse:\t{2:.4} km/s \nDelta V for Injection into target orbit:\t{3:.4} km/s\nOverall Delta V:\t{4:.4} km/s'.format(object1.displayname,object2.displayname,delta_v1*self.AUinKM,delta_v2*self.AUinKM,np.abs(delta_v1+delta_v2)*self.AUinKM) , keplers)
+
         self.current_objects.append(lambert_object)
         self.redraw_current_objects()
 
@@ -1001,12 +979,19 @@ class plot_application:
         y = root.winfo_y()
         top.geometry("+%d+%d" % (x + 10, y + 20))
         top.title("rendezvous tool")
-
+        top.rowconfigure(0, weight=1)
+        top.columnconfigure(0, weight=1)
         dropdown_frame = tkinter.Frame(top)
+        info_frame = tkinter.Frame(top)
         button_frame = tkinter.Frame(top)
-        dropdown_frame.grid(row=0,column=0)
-        button_frame.grid(row=1,column=0)
+        dropdown_frame.columnconfigure(0, weight=1)
+        info_frame.columnconfigure(0, weight=1)
+        dropdown_frame.rowconfigure(0, weight=1)
+        info_frame.rowconfigure(0, weight=1)
 
+        dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        info_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
+        button_frame.grid(row=2,column=0)
         choice_1 = tkinter.OptionMenu(dropdown_frame, choice_1_var, *choice_list)
         choice_2 = tkinter.OptionMenu(dropdown_frame, choice_2_var, *choice_list)
         tkinter.Label(dropdown_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
@@ -1014,12 +999,100 @@ class plot_application:
         choice_1.grid(row=0,column=1,sticky=tkinter.E)
         choice_2.grid(row=1,column=1,sticky=tkinter.E)
 
+        info_text_widget = tkinter.Label(info_frame,text = 'Attention: Always check for pausibillity of the solution!\n This tool can calculate a rendezvous between two\n points in space with an elliptical transfer. It uses a simple \nnumerical solver, especially at the lower\n and upper boundaries of possible solutions \nthe solver tends to shrink drastically in precision.')
+        info_text_widget.grid(row=0,column=0)
+
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
         calculate_button = tkinter.Button(button_frame,text='calculate!',command=lambda : self.calc_rendezvous(choice_1_var.get(),choice_2_var.get()))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
         top.transient(self.master)
+        top.resizable(width=False,height=False)
         return
+
+    def calc_approx__timefree_dv(self,object1,object2, dt):
+
+        return
+
+    def approx_timefree_dv(self,r1,r2,dt,starting_object):
+        r1_norm = np.linalg.norm(r1)
+        r2_norm = np.linalg.norm(r2)
+        c = np.linalg.norm(r1-r2)
+
+        v0 = self.kep2velocity(starting_object)
+        u_r1 = r1/r1_norm
+        u_c = (r2-r1)/c
+        n = np.cross(u_r1,u_c)/np.linalg.norm(np.cross(u_r1,u_c))
+        d_Theta = np.arccos( np.dot(r1,r2) / (r1_norm * r2_norm) )
+
+        v0_pi = v0 - ( (np.dot(v0,n) / np.linalg.norm(n)**2 ) * n )
+        P = np.sqrt( (2*r1_norm*r2_norm) / (self.GM_sun*c) ) * np.cos(d_Theta/2) * np.dot(v0_pi , u_r1)
+        Q = np.sqrt( (2*r1_norm*r2_norm) / (self.GM_sun*c) ) * np.cos(d_Theta/2) * np.dot(v0_pi , u_c)
+        roots = np.roots([1, P, 0, Q, 1])
+        print(roots)
+        return
+
+    def porkchop_menu(self):
+        choice_1_var = tkinter.StringVar()
+        choice_2_var = tkinter.StringVar()
+
+        choice_list = []
+        for object in self.current_objects:
+            choice_list.append(object.displayname)
+        if len(choice_list) < 2:
+            self.error_message('error','there must be atleast 2 objects to calculate a porkchop plot')
+            return
+        choice_1_var.set(choice_list[0])
+        choice_2_var.set(choice_list[1])
+
+        top = tkinter.Toplevel(self.master)
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title("rendezvous tool")
+        top.rowconfigure(0, weight=1)
+        top.columnconfigure(0, weight=1)
+        dropdown_frame = tkinter.Frame(top)
+        info_frame = tkinter.Frame(top)
+        button_frame = tkinter.Frame(top)
+        dropdown_frame.columnconfigure(0, weight=1)
+        info_frame.columnconfigure(0, weight=1)
+        dropdown_frame.rowconfigure(0, weight=1)
+        info_frame.rowconfigure(0, weight=1)
+
+        dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        info_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
+        button_frame.grid(row=2,column=0)
+        choice_1 = tkinter.OptionMenu(dropdown_frame, choice_1_var, *choice_list)
+        choice_2 = tkinter.OptionMenu(dropdown_frame, choice_2_var, *choice_list)
+        tkinter.Label(dropdown_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
+        tkinter.Label(dropdown_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
+        choice_1.grid(row=0,column=1,sticky=tkinter.E)
+        choice_2.grid(row=1,column=1,sticky=tkinter.E)
+
+        info_text_widget = tkinter.Label(info_frame,text = 'Attention: Always check for pausibillity of the solution!\n This tool can calculate a rendezvous between two\n points in space with an elliptical transfer. It uses a simple \nnumerical solver, especially at the lower\n and upper boundaries of possible solutions \nthe solver tends to shrink drastically in precision.')
+        info_text_widget.grid(row=0,column=0)
+
+        close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
+        calculate_button = tkinter.Button(button_frame,text='calculate!',command=lambda : self.calc_approx__timefree_dv(choice_1_var.get(),choice_2_var.get() , dt))
+        close_button.grid(row=0,column=0)
+        calculate_button.grid(row=0,column=1)
+        top.transient(self.master)
+        top.resizable(width=False,height=False)
+
+    def kep2velocity(self,object):
+        ecc = object.keplers['excentricity']
+        true_anomaly = object.keplers['true_anomaly']
+        a = object.keplers['a']
+        ecc_anomaly = np.arccos( (ecc + np.cos(true_anomaly)) / (1 + ecc*np.cos(true_anomaly)) )
+        r = a*(1-ecc*np.cos(ecc_anomaly))
+        # print('{0}:'.format(object.displayname))
+        # print(r)
+        # print(ecc_anomaly)
+        # print(a)
+        # pprint(object.keplers)
+        v = (np.sqrt(self.GM_sun*a) / r) * np.array([ -np.sin(ecc_anomaly) , np.sqrt(1-(ecc)**2)*np.cos(ecc_anomaly) , 0 ])
+        return v
 
 #example for lambert solver using bisection method (checking for some additional cases)
 '''
