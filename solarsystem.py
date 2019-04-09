@@ -834,7 +834,7 @@ class plot_application:
         self.JPL_numbers = self.sort_vals(self.JPL_numbers)
         self.JPL_name2num = dict((v,k) for k,v in self.JPL_numbers.items())
 
-    def solve_lambert(self,r1,r2,delta_t,object1,object2,numiters=100,tolerance=1e-6,popup = True):
+    def solve_lambert(self,r1,r2,delta_t,object1,object2,numiters=50,tolerance=1e-6,popup = True):
         ''' solve lambert problem for a single resolution and return v1,v2 and keplers of orbit
             self.GM_sun is G times mass of centerbody
 
@@ -899,11 +899,11 @@ class plot_application:
         u_c = (r2-r1)/c
         v_1 = (B+A)*u_c + (B-A)*u_1
         v_2 = (B+A)*u_c - (B-A)*u_2
-        if popup:
-            v_1 = [val for sublist in v_1 for val in sublist]
-            v_2 = [val for sublist in v_2 for val in sublist]
-            r1 = [val for sublist in r1 for val in sublist]
-            r2 = [val for sublist in r2 for val in sublist]
+        # if popup:
+        #     # v_1 = [val for sublist in v_1 for val in sublist]
+        #     # v_2 = [val for sublist in v_2 for val in sublist]
+        #     r1 = [val for sublist in r1 for val in sublist]
+        #     r2 = [val for sublist in r2 for val in sublist]
         if popup:
             v_p1 = self.kep2velocity(object1)
             v_p2 = self.kep2velocity(object2)
@@ -916,6 +916,9 @@ class plot_application:
         delta_v1 = np.linalg.norm(v_1 - v_p1)
         delta_v2 = np.linalg.norm(v_2 - v_p2)
         ecc, inclination, Omega, omega, true_anomaly = self.kart2kep(r2,v_2)
+        if not popup:
+            if inclination > np.pi:
+                return False,False,False,False,False
         keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':true_anomaly,'a':a}
         return v_1, v_2, keplers, delta_v1, delta_v2
 
@@ -936,7 +939,7 @@ class plot_application:
 
         v1,v2,keplers, delta_v1, delta_v2 = self.solve_lambert(pos1,pos2,dt,object1,object2)
 
-        if v1 == False:
+        if type(v1) ==type(False):
             return
         # print('v1: {0}\nv2:{1}\nkeplers:{2}\n'.format(v1,v2,keplers))
         #def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
@@ -957,6 +960,7 @@ class plot_application:
 
     def kart2kep(self,r,v):
         h = np.cross(r,v)
+        h_norm = h / np.linalg.norm(h)
         ecc_vector = (np.cross(v,h)/self.GM_sun) - (r/np.linalg.norm(r))
         ecc = np.linalg.norm(ecc_vector)
         n = np.array([ -h[1] , h[0] , 0 ])
@@ -965,6 +969,7 @@ class plot_application:
         else:
             true_anomaly = 2*np.pi - np.arccos(np.dot(ecc_vector,r)/(np.linalg.norm(ecc_vector)*np.linalg.norm(r)))
         inclination = np.arccos(h[2]/np.linalg.norm(h))
+        # inclination = np.arctan2(np.sqrt(h_norm[0]**2 + h_norm[1]**2) , h_norm[2])
         if n[1] >=0:
             Omega = np.arccos(n[0]/np.linalg.norm(n))
         else:
