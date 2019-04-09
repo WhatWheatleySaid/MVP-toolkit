@@ -12,6 +12,7 @@ from matplotlib.text import Annotation
 from matplotlib import colors
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.ticker import LinearLocator
 from pathlib import Path
 import pickle
 import tkinter
@@ -1164,6 +1165,9 @@ class plot_application:
         im = ax.imshow(dV_array_depart,origin='lower',cmap='BuGn_r',interpolation = 'bilinear', extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
         ax.xaxis_date()
         ax.yaxis_date()
+        ax.xaxis.set_major_locator(LinearLocator())
+        ax.yaxis.set_major_locator(LinearLocator())
+
         date_format = mdates.DateFormatter('%Y-%m-%d')
         ax.xaxis.set_major_formatter(date_format)
         ax.yaxis.set_major_formatter(date_format)
