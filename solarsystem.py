@@ -11,6 +11,7 @@ from mpl_toolkits.mplot3d.proj3d import proj_transform
 from matplotlib.text import Annotation
 from matplotlib import colors
 from matplotlib import pyplot as plt
+import matplotlib.dates as mdates
 from pathlib import Path
 import pickle
 import tkinter
@@ -837,6 +838,8 @@ class plot_application:
             self.GM_sun is G times mass of centerbody
 
         '''
+        r1 = [float(entry) for entry in r1]
+        r2 = [float(entry) for entry in r2]
         r1 = np.array(r1)
         r2 = np.array(r2)
         c = np.linalg.norm(r1-r2)
@@ -855,15 +858,15 @@ class plot_application:
         min_tof = (np.sqrt(2)/3)  * np.sqrt((s**3)/self.GM_sun) * ( 1 - (((s-c)/s)**(3/2)) )
         max_tof = lambert_rhs(a_min)
         if delta_t < min_tof:
-            print('time is to short')
+            # print('time is to short')
             if popup:
                 self.error_message('error','time period is to short to make a elliptical transfer')
-            return False,False,False
+            return False,False,False,False,False
         if delta_t > max_tof:
-            print('time is to long')
+            # print('time is to long')
             if popup:
                 self.error_message('error','time period is to long to make a elliptical transfer')
-            return False,False,False
+            return False,False,False,False,False
 
         iter = 0
 
@@ -882,10 +885,10 @@ class plot_application:
 
             #did not converge
             if iter == numiters or tof == 'nan':
-                print('did not converge')
+                # print('did not converge')
                 if popup:
                     self.error_message('error','lambert solver did not converge in {0} itterations'.format(numiters))
-                return False,False,False
+                return False,False,False,False,False
 
         coeff = 0.5*np.sqrt(self.GM_sun/a)
         A = coeff * (1/np.tan(np.arcsin(np.sqrt(s/(2*a)))))
@@ -895,16 +898,19 @@ class plot_application:
         u_c = (r2-r1)/c
         v_1 = (B+A)*u_c + (B-A)*u_1
         v_2 = (B+A)*u_c - (B-A)*u_2
-        v_1 = [val for sublist in v_1 for val in sublist]
-        v_2 = [val for sublist in v_2 for val in sublist]
-        r1 = [val for sublist in r1 for val in sublist]
-        r2 = [val for sublist in r2 for val in sublist]
+        if popup:
+            v_1 = [val for sublist in v_1 for val in sublist]
+            v_2 = [val for sublist in v_2 for val in sublist]
+            r1 = [val for sublist in r1 for val in sublist]
+            r2 = [val for sublist in r2 for val in sublist]
         if popup:
             v_p1 = self.kep2velocity(object1)
             v_p2 = self.kep2velocity(object2)
         else:
-            v_p1 = object1
-            v_p2 = object2
+            v_p1 = [float(entry) for entry in object1]
+            v_p2 = [float(entry) for entry in object2]
+            v_p1 = np.array(v_p1) / (24*60*60)
+            v_p2 = np.array(v_p2) / (24*60*60)
         # print('v_p1 : {0}\nv_p2 : {1}\n'.format(v_p1*self.AUinKM,v_p2*self.AUinKM))
         delta_v1 = np.linalg.norm(v_1 - v_p1)
         delta_v2 = np.linalg.norm(v_2 - v_p2)
@@ -1111,21 +1117,66 @@ class plot_application:
 
     def calc_porkchop(self,selection1,selection2,resolution,date1,date2):
 
-        print('to be implemented')
         for object in self.current_objects:
             if object.displayname == selection1:
                 object1 = object
             if object.displayname == selection2:
                 object2 = object
-        vectors = self.request_vector_timerange(object1.id,date1,date2,resolution)
+        vectors1 = self.request_vector_timerange(object1.id,date1,date2,resolution)
+        vectors2 = self.request_vector_timerange(object2.id,date1,date2,resolution)
+        dV_array_depart = np.zeros((len(vectors1)+1,len(vectors2)+1))
+        dV_array_arrival = dV_array_depart
+        counter1 = 0
+        counter2 = 0
+        #def solve_lambert(self,r1,r2,delta_t,object1,object2,numiters=100,tolerance=1e-6,popup = True):
+        #v_1, v_2, keplers, delta_v1, delta_v2
+        print('calculating ...')
+        for vector1 in vectors1:
+            for vector2 in vectors2:
+                date_vector1 = datetime.datetime.strptime(vector1[1],"A.D.%Y-%b-%d00:00:00.0000")
+                date_vector2 = datetime.datetime.strptime(vector2[1],"A.D.%Y-%b-%d00:00:00.0000")
+                delta_t = date_vector2 - date_vector1
+                _,_,_,dV_array_depart[counter1][counter2],dV_array_arrival[counter1][counter2] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False)
+                if dV_array_depart[counter1][counter2] == False:
+                    dV_array_depart[counter1][counter2] = np.nan
+                    dV_array_arrival[counter1][counter2] = np.nan
+                counter2 = counter2 +1
+            counter1 = counter1 + 1
+            counter2 = 0
+        date_list = [datetime.datetime.strptime(vector[1],"A.D.%Y-%b-%d00:00:00.0000") for vector in vectors1 ]
+        date_list = mdates.date2num(date_list)
+        dV_array_depart = dV_array_depart * self.AUinKM
+        dV_array_arrival = dV_array_arrival * self.AUinKM
+        print('done!')
+        top = tkinter.Toplevel()
+        top.rowconfigure(0,weight=1)
+        top.columnconfigure(0,weight=1)
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title("porkchop plot")
+        fig = plt.figure()
+        canvas = FigureCanvasTkAgg(fig, master=top)
+        canvas.get_tk_widget().grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        canvas.get_tk_widget().rowconfigure(0,weight=1)
+        canvas.get_tk_widget().columnconfigure(0,weight=1)
+        ax = fig.gca()
+        im = ax.imshow(dV_array_depart,origin='lower',cmap='BuGn_r',interpolation = 'bilinear', extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
+        ax.xaxis_date()
+        ax.yaxis_date()
+        date_format = mdates.DateFormatter('%Y-%m-%d')
+        ax.xaxis.set_major_formatter(date_format)
+        ax.yaxis.set_major_formatter(date_format)
+        ax.grid(b=True,axis='both',linestyle= '--',dashes=(10,15) ,color='k')
+        ax.set_title('porkchop plot for 0 rev. transfers between {0} and {1}'.format(object1.displayname,object2.displayname))
+        fig.autofmt_xdate()
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label(r'$\Delta$V in $\frac{km}{s}$')
+        canvas.draw()
+
         return
 
     def request_vector_timerange(self,id,date1,date2,resolution,errors=0):
-
-        print(id)
-        print(date1)
-        print(date2)
-        print(resolution)
         batchfile = self.batchfile_timerange
         batchfile['COMMAND'] = str(id)
         batchfile['START_TIME'] = "'"+str(date1)+"'"
@@ -1144,9 +1195,7 @@ class plot_application:
         vectors = r.text.split('$$SOE')[1].split('$$EOE')[0].replace(' ','').splitlines()
         del vectors[0]
         vectors = [vector.split(',') for vector in vectors]
-        pprint(vectors)
-        print(len(vectors))
-        print(len(vectors[0]))
+        vectors = np.array(vectors)
         return vectors
 
     def kep2velocity(self,object):
@@ -1163,62 +1212,6 @@ class plot_application:
         v = (np.sqrt(self.GM_sun*a) / r) * np.array([ -np.sin(ecc_anomaly) , np.sqrt(1-(ecc)**2)*np.cos(ecc_anomaly) , 0 ])
         return v
 
-#example for lambert solver using bisection method (checking for some additional cases)
-'''
-    def solve_lambert(k, r0, r, tof, short=True, numiter=35, rtol=1e-6):
-        if short:
-            t_m = +1
-        else:
-            t_m = -1
-
-        norm_r0 = np.dot(r0, r0)**.5
-        norm_r = np.dot(r, r)**.5
-        cos_dnu = np.dot(r0, r) / (norm_r0 * norm_r)
-        sin_dnu = t_m * (1 - cos_dnu ** 2)**.5
-
-        A = t_m * (norm_r * norm_r0 * (1 + cos_dnu))**.5
-
-        if A == 0.0:
-            raise RuntimeError("Cannot compute orbit")
-
-        psi = 0.0
-        psi_low = -4 * np.pi
-        psi_up = 4 * np.pi
-
-        count = 0
-        while count < numiter:
-            y = norm_r0 + norm_r + A * (psi * c3(psi) - 1) / c2(psi)**.5
-            if A > 0.0 and y < 0.0:
-                # Readjust xi_low until y > 0.0 (?)
-                pass
-            xi = np.sqrt(y / c2(psi))
-            tof_new = (xi**3 * c3(psi) + A * np.sqrt(y)) / np.sqrt(k)
-
-            # Convergence check
-            if np.abs((tof_new - tof) / tof) < rtol:
-                break
-            else:
-                count += 1
-                # Bisection check
-                if tof_new <= tof:
-                    psi_low = psi
-                else:
-                    psi_up = psi
-                psi = (psi_up + psi_low) / 2
-        else:
-            raise RuntimeError("Convergence could not be achieved under "
-                               "%d iterations" % numiter)
-
-        f = 1 - y / norm_r0
-        g = A * np.sqrt(y / k)
-
-        gdot = 1 - y / norm_r
-
-        v0 = (r - f * r0) / g
-        v = (gdot * r - r0) / g
-
-        return v0, v
-'''
 
 if __name__ == '__main__':
     root = tkinter.Tk()
