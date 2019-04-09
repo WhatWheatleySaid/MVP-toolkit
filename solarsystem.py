@@ -917,7 +917,7 @@ class plot_application:
         delta_v2 = np.linalg.norm(v_2 - v_p2)
         ecc, inclination, Omega, omega, true_anomaly = self.kart2kep(r2,v_2)
         if not popup:
-            if inclination > np.pi:
+            if inclination > np.pi/2:
                 return False,False,False,False,False
         keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':true_anomaly,'a':a}
         return v_1, v_2, keplers, delta_v1, delta_v2
@@ -1167,7 +1167,7 @@ class plot_application:
         canvas.get_tk_widget().rowconfigure(0,weight=1)
         canvas.get_tk_widget().columnconfigure(0,weight=1)
         ax = fig.gca()
-        im = ax.imshow(dV_array_depart,origin='lower',cmap='BuGn_r',interpolation = 'bilinear', extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
+        im = ax.imshow(dV_array_depart,origin='lower',cmap='plasma',interpolation = 'bilinear',vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
         ax.xaxis_date()
         ax.yaxis_date()
         ax.xaxis.set_major_locator(LinearLocator())
@@ -1180,7 +1180,7 @@ class plot_application:
         ax.set_title('porkchop plot for 0 rev. transfers between {0} and {1}'.format(object1.displayname,object2.displayname))
         fig.autofmt_xdate()
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(r'$\Delta$V in $\frac{km}{s}$')
+        cbar.set_label(r'departure $\Delta$V in $\frac{km}{s}$')
         canvas.draw()
 
         return
