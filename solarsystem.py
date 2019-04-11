@@ -23,7 +23,7 @@ import csv
 import configparser,ast
 # from pykep import lambert_problem
 
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.ticker import ScalarFormatter
 # Implement the appearance Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
@@ -1136,17 +1136,25 @@ class plot_application:
         counter2 = 0
         #def solve_lambert(self,r1,r2,delta_t,object1,object2,numiters=100,tolerance=1e-6,popup = True):
         #v_1, v_2, keplers, delta_v1, delta_v2
+        self.prog_bar["value"] = 0
+        self.prog_bar["maximum"] = len(vectors1)
         print('calculating ...')
         for vector1 in vectors1:
             for vector2 in vectors2:
                 date_vector1 = datetime.datetime.strptime(vector1[1],"A.D.%Y-%b-%d00:00:00.0000")
                 date_vector2 = datetime.datetime.strptime(vector2[1],"A.D.%Y-%b-%d00:00:00.0000")
                 delta_t = date_vector2 - date_vector1
-                _,_,_,dV_array_depart[counter1][counter2],dV_array_arrival[counter1][counter2] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False)
-                if dV_array_depart[counter1][counter2] == False:
-                    dV_array_depart[counter1][counter2] = np.nan
-                    dV_array_arrival[counter1][counter2] = np.nan
+                if delta_t.total_seconds() > 0:
+                    _,_,_,dV_array_depart[counter2][counter1],dV_array_arrival[counter2][counter1] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False)
+                else:
+                    dV_array_depart[counter2][counter1] = np.nan
+                    dV_array_arrival[counter2][counter1] = np.nan
+                if dV_array_depart[counter2][counter1] == False:
+                    dV_array_depart[counter2][counter1] = np.nan
+                    dV_array_arrival[counter2][counter1] = np.nan
                 counter2 = counter2 +1
+            self.prog_bar["value"] = counter1
+            self.prog_bar.update()
             counter1 = counter1 + 1
             counter2 = 0
         date_list = [datetime.datetime.strptime(vector[1],"A.D.%Y-%b-%d00:00:00.0000") for vector in vectors1 ]
@@ -1162,12 +1170,15 @@ class plot_application:
         top.geometry("+%d+%d" % (x + 10, y + 20))
         top.title("porkchop plot")
         fig = plt.figure()
+        toolbarframe = tkinter.Frame(top)
         canvas = FigureCanvasTkAgg(fig, master=top)
         canvas.get_tk_widget().grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        toolbarframe.grid(row=1,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         canvas.get_tk_widget().rowconfigure(0,weight=1)
         canvas.get_tk_widget().columnconfigure(0,weight=1)
+        toolbar = NavigationToolbar2Tk(canvas,toolbarframe)
         ax = fig.gca()
-        im = ax.imshow(dV_array_depart,origin='lower',cmap='plasma',interpolation = 'bilinear',vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
+        im = ax.imshow(dV_array_depart,origin='lower',cmap='jet',interpolation = 'bilinear',vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
         ax.xaxis_date()
         ax.yaxis_date()
         ax.xaxis.set_major_locator(LinearLocator())
@@ -1176,7 +1187,10 @@ class plot_application:
         date_format = mdates.DateFormatter('%Y-%m-%d')
         ax.xaxis.set_major_formatter(date_format)
         ax.yaxis.set_major_formatter(date_format)
+        ax.set_xlabel('launch date YYYY/MM/DD')
+        ax.set_ylabel('arrival date YYYY/MM/DD')
         ax.grid(b=True,axis='both',linestyle= '--',dashes=(10,15) ,color='k')
+        ax.set_aspect('equal')
         ax.set_title('porkchop plot for 0 rev. transfers between {0} and {1}'.format(object1.displayname,object2.displayname))
         fig.autofmt_xdate()
         cbar = fig.colorbar(im, ax=ax)
