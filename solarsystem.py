@@ -120,7 +120,6 @@ class CustomNotebook(ttk.Notebook):
         })
     ])
 
-
 class celestial_artist:
     def __init__(self,id,orbit,pos,date,name,text,keplers):
         self.id = id
@@ -1291,13 +1290,27 @@ class plot_application:
 
         fig = plt.figure()
         fig.subplots_adjust(left=0.19, right=0.98, bottom=0.18, top=0.92)
-        toolbarframe = tkinter.Frame(porkchop_frame)
-        canvas = FigureCanvasTkAgg(fig, master=porkchop_frame)
+        canvas_frame = tkinter.Frame(porkchop_frame)
+        bottom_frame = tkinter.Frame(porkchop_frame)
+        canvas_frame.columnconfigure(0,weight=1)
+        bottom_frame.columnconfigure(0,weight=1)
+        canvas_frame.rowconfigure(0,weight=1)
+        bottom_frame.rowconfigure(0,weight=1)
+        canvas_frame.grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        bottom_frame.grid(row=1,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        toolbarframe = tkinter.Frame(bottom_frame)
+        close_button_frame = tkinter.Frame(bottom_frame)
+        close_button_frame.columnconfigure(0,weight=1)
+        toolbarframe.columnconfigure(0,weight=1)
+        canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
         canvas.get_tk_widget().grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
-        toolbarframe.grid(row=1,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+
+        toolbarframe.grid(row=0,column=0,sticky=tkinter.W)
+        close_button_frame.grid(row=0,column=1,sticky=tkinter.E)
         canvas.get_tk_widget().rowconfigure(0,weight=1)
         canvas.get_tk_widget().columnconfigure(0,weight=1)
         toolbar = NavigationToolbar2Tk(canvas,toolbarframe)
+        tkinter.Button(close_button_frame,text='close',command= lambda: self.notebook.forget(self.notebook.select())).grid(row=0,column=1,sticky=tkinter.E)
         ax = fig.gca()
         im = ax.imshow(dV_array_depart,origin='lower',cmap='jet',interpolation = interpolation,vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
         ax.xaxis_date()
