@@ -1187,6 +1187,7 @@ class plot_application:
         choice_2_var.set(choice_list[1])
         resolution_var.set('10')
         top = tkinter.Toplevel(self.master)
+        top.group(self.master)
         x = root.winfo_x()
         y = root.winfo_y()
         top.geometry("+%d+%d" % (x + 10, y + 20))
@@ -1240,8 +1241,8 @@ class plot_application:
         calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get()))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
-        top.transient(self.master)
         top.resizable(width=False,height=False)
+        top.transient(self.master)
 
     def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation):
 
@@ -1316,7 +1317,13 @@ class plot_application:
         cbar = fig.colorbar(im, ax=ax)
         cbar.set_label(r'departure $\Delta$V in $\frac{km}{s}$')
         canvas.draw()
-        self.notebook.add(porkchop_frame,text='{0} -> {1}'.format(object1.displayname,object2.displayname))
+        name1= object1.displayname
+        name2= object2.displayname
+        if len(name1) >15:
+            name1 = name1[0:15]+'..'
+        if len(name2) >15:
+            name2 = name2[0:15]+'..'
+        self.notebook.add(porkchop_frame,text='{0} -> {1}'.format(name1,name2))
         self.notebook.select(self.notebook.tabs()[-1])
 
         return
