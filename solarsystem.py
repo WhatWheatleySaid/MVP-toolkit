@@ -32,6 +32,95 @@ from tkinter import filedialog
 # import io
 # from PIL import Image
 
+class CustomNotebook(ttk.Notebook):
+    """A ttk Notebook with close buttons on each tab"""
+
+    __initialized = False
+
+    def __init__(self, *args, **kwargs):
+        if not self.__initialized:
+            self.__initialize_custom_style()
+            self.__inititialized = True
+
+        kwargs["style"] = "CustomNotebook"
+        ttk.Notebook.__init__(self, *args, **kwargs)
+
+        self._active = None
+
+        self.bind("<ButtonPress-1>", self.on_close_press, True)
+        self.bind("<ButtonRelease-1>", self.on_close_release)
+
+    def on_close_press(self, event):
+        """Called when the button is pressed over the close button"""
+
+        element = self.identify(event.x, event.y)
+
+        if "close" in element:
+            index = self.index("@%d,%d" % (event.x, event.y))
+            self.state(['pressed'])
+            self._active = index
+
+    def on_close_release(self, event):
+        """Called when the button is released over the close button"""
+        if not self.instate(['pressed']):
+            return
+
+        element =  self.identify(event.x, event.y)
+        index = self.index("@%d,%d" % (event.x, event.y))
+
+        if "close" in element and self._active == index:
+            self.forget(index)
+            self.event_generate("<<NotebookTabClosed>>")
+
+        self.state(["!pressed"])
+        self._active = None
+
+    def __initialize_custom_style(self):
+        style = ttk.Style()
+        self.images = (
+            tkinter.PhotoImage("img_close", data='''
+                R0lGODlhCAAIAMIBAAAAADs7O4+Pj9nZ2Ts7Ozs7Ozs7Ozs7OyH+EUNyZWF0ZWQg
+                d2l0aCBHSU1QACH5BAEKAAQALAAAAAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU
+                5kEJADs=
+                '''),
+            tkinter.PhotoImage("img_closeactive", data='''
+                R0lGODlhCAAIAMIEAAAAAP/SAP/bNNnZ2cbGxsbGxsbGxsbGxiH5BAEKAAQALAAA
+                AAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU5kEJADs=
+                '''),
+            tkinter.PhotoImage("img_closepressed", data='''
+                R0lGODlhCAAIAMIEAAAAAOUqKv9mZtnZ2Ts7Ozs7Ozs7Ozs7OyH+EUNyZWF0ZWQg
+                d2l0aCBHSU1QACH5BAEKAAQALAAAAAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU
+                5kEJADs=
+            ''')
+        )
+
+        style.element_create("close", "image", "img_close",
+                            ("active", "pressed", "!disabled", "img_closepressed"),
+                            ("active", "!disabled", "img_closeactive"), border=8, sticky='')
+        style.layout("CustomNotebook", [("CustomNotebook.client", {"sticky": "nswe"})])
+        style.layout("CustomNotebook.Tab", [
+            ("CustomNotebook.tab", {
+                "sticky": "nswe",
+                "children": [
+                    ("CustomNotebook.padding", {
+                        "side": "top",
+                        "sticky": "nswe",
+                        "children": [
+                            ("CustomNotebook.focus", {
+                                "side": "top",
+                                "sticky": "nswe",
+                                "children": [
+                                    ("CustomNotebook.label", {"side": "left", "sticky": ''}),
+                                    ("CustomNotebook.close", {"side": "left", "sticky": ''}),
+                                ]
+                        })
+                    ]
+                })
+            ]
+        })
+    ])
+
+
 class celestial_artist:
     def __init__(self,id,orbit,pos,date,name,text,keplers):
         self.id = id
@@ -105,7 +194,22 @@ class plot_application:
         self.fig = plt.figure(facecolor = self.custom_color)
         self.fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99)
         self.master.wm_title("JPL horizons DB visualisation")
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)  # A tk.DrawingArea.
+        self.notebook_frame = ttk.Frame(self.master,borderwidth=2)
+        self.notebook_frame.grid(row=0,column=0,columnspan=10,rowspan=12,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        self.notebook_frame.columnconfigure(0,weight=1)
+        self.notebook_frame.rowconfigure(0,weight=1)
+        self.notebook = ttk.Notebook(self.notebook_frame)
+        self.canvas_frame = ttk.Frame(self.notebook)
+        self.canvas_frame.grid(row=0,column=0,columnspan=10,rowspan=12,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        self.canvas_frame.rowconfigure(0, weight=1)
+        self.canvas_frame.columnconfigure(0, weight=1)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.canvas_frame) # A tk.DrawingArea.
+        self.notebook.add(self.canvas_frame,text="orbits")
+        self.porkchop_frames = []
+        self.notebook.grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        self.notebook.columnconfigure(0,weight=1)
+        self.notebook.rowconfigure(0,weight=1)
+
         self.pick_event_cid = self.fig.canvas.mpl_connect('pick_event',self.clicked_on)
         self.canvas.get_tk_widget().bind('<ButtonPress-1>',self.canvas_mouseturn,add='+')
         self.canvas.get_tk_widget().bind('<ButtonPress-3>',self.canvas_mousezoom,add='+')
@@ -120,7 +224,7 @@ class plot_application:
 
         self.ax = self.fig.gca(projection = '3d',facecolor =  self.custom_color,proj_type = 'ortho')
 
-        self.canvas.get_tk_widget().grid(row=0,column=0,columnspan=10,rowspan=10,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        self.canvas.get_tk_widget().grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         self.viewbuttons_frame = tkinter.Frame(master= self.canvas.get_tk_widget())
         self.viewbuttons_frame.place(rely=1,relx=0,anchor=tkinter.SW)
 
@@ -442,14 +546,14 @@ class plot_application:
             r = np.matmul(self.rot_x(i),r)
             r = np.matmul(self.rot_z(Omega),r)
         elif e >1:
-            if self.kepler_dict["true_anomaly"] > 2:
+            if true_anomaly > 2:
                 plot_range = 3*np.pi/4
-                if plot_range < np.abs(self.kepler_dict["true_anomaly"]):
-                    plot_range = np.abs(self.kepler_dict["true_anomaly"])
+                if plot_range < np.abs(true_anomaly):
+                    plot_range = np.abs(true_anomaly)
             else:
                 plot_range = 3/4 * np.pi -np.pi
-                if plot_range > np.abs(self.kepler_dict["true_anomaly"]):
-                    plot_range = np.abs(self.kepler_dict["true_anomaly"])
+                if plot_range > np.abs(true_anomaly):
+                    plot_range = np.abs(true_anomaly)
             nu = np.linspace(-plot_range,plot_range,self.resolution)
             p = a * (1-(e**2))
             r = p/(1+e*np.cos(nu))
@@ -1079,7 +1183,7 @@ class plot_application:
             return
         choice_1_var.set(choice_list[0])
         choice_2_var.set(choice_list[1])
-        resolution_var.set('1')
+        resolution_var.set('10')
         top = tkinter.Toplevel(self.master)
         x = root.winfo_x()
         y = root.winfo_y()
@@ -1102,7 +1206,7 @@ class plot_application:
         choice_1 = tkinter.OptionMenu(dropdown_frame, choice_1_var, *choice_list)
         choice_2 = tkinter.OptionMenu(dropdown_frame, choice_2_var, *choice_list)
         cal1 = DateEntry(dropdown_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
-        cal2 = DateEntry(dropdown_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+1, month=self.dt.month, day=self.dt.day)
+        cal2 = DateEntry(dropdown_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
         resolution_entry = tkinter.Entry(dropdown_frame,validate = 'key', validatecommand=vcmd,textvariable=resolution_var)
         resolution_entry.grid(row=2,column=2,sticky=tkinter.W)
         resolution_entry.bind("<FocusIn>",Entry_Callback)
@@ -1162,16 +1266,14 @@ class plot_application:
         dV_array_depart = dV_array_depart * self.AUinKM
         dV_array_arrival = dV_array_arrival * self.AUinKM
         print('done!')
-        top = tkinter.Toplevel()
-        top.rowconfigure(0,weight=1)
-        top.columnconfigure(0,weight=1)
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("porkchop plot")
+        porkchop_frame =  ttk.Frame(self.notebook)
+        porkchop_frame.rowconfigure(0,weight=1)
+        porkchop_frame.columnconfigure(0,weight=1)
+
         fig = plt.figure()
-        toolbarframe = tkinter.Frame(top)
-        canvas = FigureCanvasTkAgg(fig, master=top)
+        fig.subplots_adjust(left=0.16, right=0.98, bottom=0.18, top=0.92)
+        toolbarframe = tkinter.Frame(porkchop_frame)
+        canvas = FigureCanvasTkAgg(fig, master=porkchop_frame)
         canvas.get_tk_widget().grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         toolbarframe.grid(row=1,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         canvas.get_tk_widget().rowconfigure(0,weight=1)
@@ -1191,11 +1293,13 @@ class plot_application:
         ax.set_ylabel('arrival date YYYY/MM/DD')
         ax.grid(b=True,axis='both',linestyle= '--',dashes=(10,15) ,color='k')
         ax.set_aspect('equal')
-        ax.set_title('porkchop plot for 0 rev. transfers between {0} and {1}'.format(object1.displayname,object2.displayname))
+        ax.set_title('0 rev. transfers between {0} and {1}'.format(object1.displayname,object2.displayname))
         fig.autofmt_xdate()
         cbar = fig.colorbar(im, ax=ax)
         cbar.set_label(r'departure $\Delta$V in $\frac{km}{s}$')
         canvas.draw()
+        self.notebook.add(porkchop_frame,text='{0} -> {1}'.format(object1.displayname,object2.displayname))
+        self.notebook.select(self.notebook.tabs()[-1])
 
         return
 
