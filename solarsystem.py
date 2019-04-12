@@ -528,7 +528,7 @@ class plot_application:
         self.equinox_artists.append(self.annotate3D(self.ax, s='vernal equinox', xyz=[length,0,0], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = self.text_color))
         self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
 
-    def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
+    def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False,comp_true_anomaly=False):
         '''calculate orbit 3x1 radius vector'''
         if not(true_anomaly==False):
             p = a * (1-(e**2))
@@ -546,14 +546,14 @@ class plot_application:
             r = np.matmul(self.rot_x(i),r)
             r = np.matmul(self.rot_z(Omega),r)
         elif e >1:
-            if true_anomaly > 2:
+            if comp_true_anomaly > 2:
                 plot_range = 3*np.pi/4
-                if plot_range < np.abs(true_anomaly):
-                    plot_range = np.abs(true_anomaly)
+                if plot_range < np.abs(comp_true_anomaly):
+                    plot_range = np.abs(comp_true_anomaly)
             else:
                 plot_range = 3/4 * np.pi -np.pi
-                if plot_range > np.abs(true_anomaly):
-                    plot_range = np.abs(true_anomaly)
+                if plot_range > np.abs(comp_true_anomaly):
+                    plot_range = np.abs(comp_true_anomaly)
             nu = np.linspace(-plot_range,plot_range,self.resolution)
             p = a * (1-(e**2))
             r = p/(1+e*np.cos(nu))
@@ -763,7 +763,7 @@ class plot_application:
                 kepler_dict['true_anomaly'] = np.deg2rad(kepler_dict['true_anomaly'])
                 # print('\n\n{0}:\n'.format(self.JPL_numbers[object]))
                 # pprint(kepler_dict)
-                orbit = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'])
+                orbit = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'] , comp_true_anomaly=kepler_dict['true_anomaly'] )
                 position = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'],[kepler_dict['true_anomaly']])
                 orbits.append(orbit)
                 positions.append(position)
@@ -1047,7 +1047,7 @@ class plot_application:
             return
         # print('v1: {0}\nv2:{1}\nkeplers:{2}\n'.format(v1,v2,keplers))
         #def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
-        orbit = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'])
+        orbit = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],comp_true_anomaly=kepler_dict['true_anomaly'])
         pos = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],[keplers['true_anomaly'] + np.pi/2])
 
 
@@ -1174,7 +1174,9 @@ class plot_application:
         choice_1_var = tkinter.StringVar()
         choice_2_var = tkinter.StringVar()
         resolution_var = tkinter.StringVar()
-
+        interpolation_list = ['none', 'nearest', 'bilinear', 'bicubic', 'spline16', 'spline36', 'hanning', 'hamming', 'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian', 'bessel', 'mitchell', 'sinc', 'lanczos']
+        interpolation_var = tkinter.StringVar()
+        interpolation_var.set('bilinear')
         choice_list = []
         for object in self.current_objects:
             choice_list.append(object.displayname)
@@ -1200,32 +1202,48 @@ class plot_application:
         info_frame.rowconfigure(0, weight=1)
 
         dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        object_frame = tkinter.Frame(dropdown_frame,borderwidth=2)
+        object_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        object_frame.columnconfigure(0,weight=1)
+        date_frame = tkinter.Frame(dropdown_frame,borderwidth=2)
+        date_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
+        date_frame.columnconfigure(0,weight=1)
+        misc_frame = tkinter.Frame(dropdown_frame,borderwidth=2)
+        misc_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E)
+        misc_frame.columnconfigure(0,weight=1)
         vcmd = (dropdown_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        info_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
         button_frame.grid(row=2,column=0)
-        choice_1 = tkinter.OptionMenu(dropdown_frame, choice_1_var, *choice_list)
-        choice_2 = tkinter.OptionMenu(dropdown_frame, choice_2_var, *choice_list)
-        cal1 = DateEntry(dropdown_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
-        cal2 = DateEntry(dropdown_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
-        resolution_entry = tkinter.Entry(dropdown_frame,validate = 'key', validatecommand=vcmd,textvariable=resolution_var)
-        resolution_entry.grid(row=2,column=2,sticky=tkinter.W)
+        choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
+        choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
+        cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
+        cal2 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
+        resolution_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd,textvariable=resolution_var)
         resolution_entry.bind("<FocusIn>",Entry_Callback)
-        tkinter.Label(dropdown_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
-        tkinter.Label(dropdown_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
-        tkinter.Label(dropdown_frame, text='resolution in days:').grid(row=2,column=0,sticky=tkinter.W)
-        choice_1.grid(row=0,column=1,sticky=tkinter.E)
-        choice_2.grid(row=1,column=1,sticky=tkinter.E)
-        cal1.grid(row=0,column = 2)
-        cal2.grid(row=1,column = 2)
+        interpolation_choice = tkinter.OptionMenu(misc_frame, interpolation_var, *interpolation_list)
+
+
+        tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
+        tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
+        tkinter.Label(date_frame, text='from').grid(row=2,column=1)
+        tkinter.Label(date_frame, text='to').grid(row=2,column=2)
+        tkinter.Label(date_frame, text='date range:').grid(row=3,column=0,sticky=tkinter.W)
+        tkinter.Label(misc_frame, text='resolution in days:').grid(row=4,column=0,sticky=tkinter.W)
+        tkinter.Label(misc_frame, text='image interpolation:').grid(row=5,column=0,sticky=tkinter.W)
+        choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
+        choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
+        cal1.grid(row=3,column = 1,sticky=tkinter.E+tkinter.W)
+        cal2.grid(row=3,column = 2,sticky=tkinter.E+tkinter.W)
+        resolution_entry.grid(row=4,column=2,sticky=tkinter.E)
+        interpolation_choice.grid(row=5,column=2,sticky=tkinter.E)
 
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date()))
+        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get()))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
         top.transient(self.master)
         top.resizable(width=False,height=False)
 
-    def calc_porkchop(self,selection1,selection2,resolution,date1,date2):
+    def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation):
 
         for object in self.current_objects:
             if object.displayname == selection1:
@@ -1271,7 +1289,7 @@ class plot_application:
         porkchop_frame.columnconfigure(0,weight=1)
 
         fig = plt.figure()
-        fig.subplots_adjust(left=0.16, right=0.98, bottom=0.18, top=0.92)
+        fig.subplots_adjust(left=0.19, right=0.98, bottom=0.18, top=0.92)
         toolbarframe = tkinter.Frame(porkchop_frame)
         canvas = FigureCanvasTkAgg(fig, master=porkchop_frame)
         canvas.get_tk_widget().grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
@@ -1280,7 +1298,7 @@ class plot_application:
         canvas.get_tk_widget().columnconfigure(0,weight=1)
         toolbar = NavigationToolbar2Tk(canvas,toolbarframe)
         ax = fig.gca()
-        im = ax.imshow(dV_array_depart,origin='lower',cmap='jet',interpolation = 'bilinear',vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
+        im = ax.imshow(dV_array_depart,origin='lower',cmap='jet',interpolation = interpolation,vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
         ax.xaxis_date()
         ax.yaxis_date()
         ax.xaxis.set_major_locator(LinearLocator())
@@ -1292,7 +1310,7 @@ class plot_application:
         ax.set_xlabel('launch date YYYY/MM/DD')
         ax.set_ylabel('arrival date YYYY/MM/DD')
         ax.grid(b=True,axis='both',linestyle= '--',dashes=(10,15) ,color='k')
-        ax.set_aspect('equal')
+        ax.set_aspect('auto')
         ax.set_title('0 rev. transfers between {0} and {1}'.format(object1.displayname,object2.displayname))
         fig.autofmt_xdate()
         cbar = fig.colorbar(im, ax=ax)
