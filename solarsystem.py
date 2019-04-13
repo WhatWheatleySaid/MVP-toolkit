@@ -1157,14 +1157,22 @@ class plot_application:
 
     def porkchop_menu(self):
 
-        def validate(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-            if text in '0123456789':
-                try:
-                    int(value_if_allowed)
-                    return True
-                except ValueError:
-                    return False
-            else:
+        def validate_int(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+            if not value_if_allowed:
+                return True
+            try:
+                int(value_if_allowed)
+                return True
+            except ValueError:
+                return False
+
+        def validate_float(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+            if not value_if_allowed:
+                return True
+            try:
+                float(value_if_allowed)
+                return True
+            except ValueError:
                 return False
 
         def Entry_Callback(event):
@@ -1173,6 +1181,11 @@ class plot_application:
         choice_1_var = tkinter.StringVar()
         choice_2_var = tkinter.StringVar()
         resolution_var = tkinter.StringVar()
+        resolution_var.set('10')
+        iteration_var = tkinter.StringVar()
+        iteration_var.set('50')
+        tolerance_var = tkinter.StringVar()
+        tolerance_var.set('0.0001')
         interpolation_list = ['none', 'nearest', 'bilinear', 'bicubic', 'spline16', 'spline36', 'hanning', 'hamming', 'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian', 'bessel', 'mitchell', 'sinc', 'lanczos']
         interpolation_var = tkinter.StringVar()
         interpolation_var.set('bilinear')
@@ -1184,7 +1197,7 @@ class plot_application:
             return
         choice_1_var.set(choice_list[0])
         choice_2_var.set(choice_list[1])
-        resolution_var.set('10')
+
         top = tkinter.Toplevel(self.master)
         top.group(self.master)
         x = root.winfo_x()
@@ -1202,48 +1215,55 @@ class plot_application:
         info_frame.rowconfigure(0, weight=1)
 
         dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        object_frame = tkinter.Frame(dropdown_frame,borderwidth=2)
+        object_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
         object_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
         object_frame.columnconfigure(0,weight=1)
-        date_frame = tkinter.Frame(dropdown_frame,borderwidth=2)
+        date_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
         date_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
         date_frame.columnconfigure(0,weight=1)
-        misc_frame = tkinter.Frame(dropdown_frame,borderwidth=2)
+        misc_frame = tkinter.LabelFrame(dropdown_frame,text='advanced settings',pady=5,padx=5)
         misc_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E)
         misc_frame.columnconfigure(0,weight=1)
-        vcmd = (dropdown_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        vcmd_int = (dropdown_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        vcmd_float = (dropdown_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         button_frame.grid(row=2,column=0)
         choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
         choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
         cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
         cal2 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
-        resolution_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd,textvariable=resolution_var)
+        resolution_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_int,textvariable=resolution_var)
         resolution_entry.bind("<FocusIn>",Entry_Callback)
+        iteration_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_int ,textvariable=iteration_var)
+        tolerance_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_float ,textvariable=tolerance_var)
         interpolation_choice = tkinter.OptionMenu(misc_frame, interpolation_var, *interpolation_list)
 
 
         tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
         tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
-        tkinter.Label(date_frame, text='from').grid(row=2,column=1)
-        tkinter.Label(date_frame, text='to').grid(row=2,column=2)
-        tkinter.Label(date_frame, text='date range:').grid(row=3,column=0,sticky=tkinter.W)
-        tkinter.Label(misc_frame, text='resolution in days:').grid(row=4,column=0,sticky=tkinter.W)
-        tkinter.Label(misc_frame, text='image interpolation:').grid(row=5,column=0,sticky=tkinter.W)
+        tkinter.Label(date_frame, text='from').grid(row=0,column=1)
+        tkinter.Label(date_frame, text='to').grid(row=0,column=2)
+        tkinter.Label(date_frame, text='date range:').grid(row=1,column=0,sticky=tkinter.W)
+        tkinter.Label(misc_frame, text='resolution in days:').grid(row=0,column=0,sticky=tkinter.W)
+        tkinter.Label(misc_frame, text='image interpolation:').grid(row=1,column=0,sticky=tkinter.W)
+        tkinter.Label(misc_frame, text='number of iterations:').grid(row=2,column=0,sticky=tkinter.W)
+        tkinter.Label(misc_frame, text='numerical tolerance:').grid(row=3,column=0,sticky=tkinter.W)
         choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
         choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
-        cal1.grid(row=3,column = 1,sticky=tkinter.E+tkinter.W)
-        cal2.grid(row=3,column = 2,sticky=tkinter.E+tkinter.W)
-        resolution_entry.grid(row=4,column=2,sticky=tkinter.E)
-        interpolation_choice.grid(row=5,column=2,sticky=tkinter.E)
+        cal1.grid(row=1,column = 1,sticky=tkinter.E+tkinter.W)
+        cal2.grid(row=1,column = 2,sticky=tkinter.E+tkinter.W)
+        resolution_entry.grid(row=0,column=2,sticky=tkinter.E)
+        interpolation_choice.grid(row=1,column=2,sticky=tkinter.E)
+        iteration_entry.grid(row=2,column=2, sticky = tkinter.E)
+        tolerance_entry.grid(row=3,column=2,sticky=tkinter.E)
 
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get()))
+        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get(), int(iteration_var.get()), float(tolerance_var.get())))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
         top.resizable(width=False,height=False)
         top.transient(self.master)
 
-    def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation):
+    def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation,iterations,tolerance):
 
         for object in self.current_objects:
             if object.displayname == selection1:
@@ -1267,7 +1287,7 @@ class plot_application:
                 date_vector2 = datetime.datetime.strptime(vector2[1],"A.D.%Y-%b-%d00:00:00.0000")
                 delta_t = date_vector2 - date_vector1
                 if delta_t.total_seconds() > 0:
-                    _,_,_,dV_array_depart[counter2][counter1],dV_array_arrival[counter2][counter1] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False)
+                    _,_,_,dV_array_depart[counter2][counter1],dV_array_arrival[counter2][counter1] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False, numiters=iterations, tolerance = tolerance)
                 else:
                     dV_array_depart[counter2][counter1] = np.nan
                     dV_array_arrival[counter2][counter1] = np.nan
@@ -1289,7 +1309,7 @@ class plot_application:
         porkchop_frame.columnconfigure(0,weight=1)
 
         fig = plt.figure()
-        fig.subplots_adjust(left=0.19, right=0.98, bottom=0.18, top=0.92)
+        fig.subplots_adjust(left=0.19, right=0.98, bottom=0.18, top=0.9)
         canvas_frame = tkinter.Frame(porkchop_frame)
         bottom_frame = tkinter.Frame(porkchop_frame)
         canvas_frame.columnconfigure(0,weight=1)
@@ -1325,7 +1345,7 @@ class plot_application:
         ax.set_ylabel('arrival date YYYY/MM/DD')
         ax.grid(b=True,axis='both',linestyle= '--',dashes=(10,15) ,color='k')
         ax.set_aspect('auto')
-        ax.set_title('0 rev. transfers between {0} and {1}'.format(object1.displayname,object2.displayname))
+        ax.set_title('0 rev. transfers between\n{0} and {1}'.format(object1.displayname,object2.displayname))
         fig.autofmt_xdate()
         cbar = fig.colorbar(im, ax=ax)
         cbar.set_label(r'departure $\Delta$V in $\frac{km}{s}$')
