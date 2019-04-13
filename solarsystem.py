@@ -733,18 +733,21 @@ class plot_application:
             self.prog_bar.update()
             if 'No ephemeris for target' in r.text:
                 print('No ephemeris for target{0} at date {1}'.format(self.JPL_numbers[object],self.dt))
+                self.error_message('DB Error','No ephemeris for target {0} at date {1}'.format(self.JPL_numbers[object],self.dt))
                 orbit = [None,None]
                 position = [None,None]
                 orbits.append([None,None])
                 positions.append([None,None])
             elif 'is out of bounds, no action taken' in r.text:
                 print('{0} is out of bounds, no action taken (couldnt find {1} in batch interface of JPL horizonss)'.format(self.JPL_numbers[object],object))
+                self.error_message('DB Error','{0} is out of bounds, no action taken (couldnt find {1} in batch interface of JPL horizonss)'.format(self.JPL_numbers[object],object))
                 orbit = [None,None]
                 position = [None,None]
                 orbits.append([None,None])
                 positions.append([None,None])
             elif 'No such record, positive values only' in r.text:
                 print('No record for {0}({1}), positive values only'.format(object,self.JPL_numbers[object]))
+                self.error_message('DB Error','No record for {0}({1}), positive values only'.format(object,self.JPL_numbers[object]))
                 orbit = [None,None]
                 position = [None,None]
                 orbits.append([None,None])
