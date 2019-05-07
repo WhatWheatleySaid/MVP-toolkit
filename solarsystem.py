@@ -1254,6 +1254,8 @@ class plot_application:
         button_frame = tkinter.Frame(top)
         button_frame.rowconfigure(0, weight=1)
         button_frame.columnconfigure(0, weight=1)
+        kepler_frame.rowconfigure(0, weight=1)
+        kepler_frame.columnconfigure(0, weight=1)
         vcmd_int = (button_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         vcmd_float = (button_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         kepler_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
@@ -1279,19 +1281,24 @@ class plot_application:
 
     def add_custom_object(self,a,ecc,i,omega,Omega,true_anomaly,name,top):
         ''' function to add a custom object to the current object list'''
+        try:
+            a = float(a.get())
+            ecc = float(ecc.get())
+            i =  np.deg2rad(float(i.get()))
+            omega =  np.deg2rad(float(omega.get()))
+            Omega =  np.deg2rad(float(Omega.get()))
+            true_anomaly =  np.deg2rad(float(true_anomaly.get()))
+            name = name.get()
+        except:
+            self.error_message('Invalid input','Please check your input parameters')
+            return
         top.destroy()
-        a = float(a.get())
-        ecc = float(ecc.get())
-        i =  np.deg2rad(float(i.get()))
-        omega =  np.deg2rad(float(omega.get()))
-        Omega =  np.deg2rad(float(Omega.get()))
-        true_anomaly =  np.deg2rad(float(true_anomaly.get()))
-        name = name.get()
         keplers = {'eccentricity' : ecc, 'a' : a, 'inclination' : i , 'omega' : omega, 'Omega' : Omega, 'true_anomaly' : true_anomaly}
         orbit = self.orbit_position(a,ecc,Omega,i,omega,comp_true_anomaly=true_anomaly)
         position = self.orbit_position(a,ecc,Omega,i,omega,[true_anomaly])
         keplers = {'eccentricity' : ecc, 'a' : a, 'inclination' : i , 'omega' : omega, 'Omega' : Omega, 'true_anomaly' : true_anomaly}
-        custom_object = celestial_artist('',orbit,position,'',name,'custom object added by user',keplers)
+        current_date = datetime.datetime.now().date()
+        custom_object = celestial_artist('',orbit,position, current_date ,name,'custom object added by user',keplers)
         self.current_objects.append(custom_object)
         self.redraw_current_objects()
 
