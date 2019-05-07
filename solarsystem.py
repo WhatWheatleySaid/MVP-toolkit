@@ -160,8 +160,16 @@ class plot_application:
         self.list = []
         self.current_objects = []
 
+        #variables for porkchop menu
+        self.pulse_direction_var = tkinter.StringVar()
+        self.pulse_direction_var.set('prograde')
+        self.porkchop_radiobuttons = []
+        self.dV_var = tkinter.StringVar()
+        self.dV_var.set('launch')
+
+
         self.default_colors = ['#191919','#7f7f7f','#ffffff','#000000']
-        self.resolution = 80
+        self.resolution = 500
         self.set_default_colors()
         self.gridlinewidth = 0.2
         self.textsize = 8
@@ -217,7 +225,7 @@ class plot_application:
 
         self.canvas.get_tk_widget().config(cursor=self.cursor)
 
-        plt.rcParams['savefig.facecolor']= self.custom_color
+        plt.rcParams['savefig.facecolor']= 'w'
         plt.rcParams['grid.color'] = self.gridcolor
         plt.rcParams['grid.linewidth'] = self.gridlinewidth
 
@@ -240,6 +248,7 @@ class plot_application:
         self.tools_menu = tkinter.Menu(self.menubar,tearoff = 0)
         self.tools_menu.add_command(label='calculate rendezvous (lambert solver)', command=self.lambert_menu)
         self.tools_menu.add_command(label='generate porkchop-plot', command=self.porkchop_menu)
+        self.tools_menu.add_command(label='add custom object', command=self.custom_object_menu)
 
         self.menubar.add_cascade(label='File',menu=self.filemenu)
         self.menubar.add_cascade(label='Tools',menu=self.tools_menu)
@@ -382,7 +391,8 @@ class plot_application:
             return
         print(dir)
         self.fig.canvas.mpl_disconnect(self.view_cid)
-        plt.savefig(dir)
+        plt.sca(self.ax)
+        plt.savefig(dir,facecolor=self.custom_color)
         # self.axis_visibility(None,'z',True)
         # self.axis_visibility(None,'y',True)
 
@@ -614,13 +624,26 @@ class plot_application:
             self.plot_orbits(self.ax,self.current_objects,refresh_canvas = True,refplane_var=self.refplane_var.get())
 
 
+    def shade_hex_color(self,hexcolor,shade_value=0.4):
+        ''' shade a hex color by shade_value
+            (shade_value is the perecntage of the input color to shade)
+        '''
+        RGB = self.hex_to_rgb(hexcolor)
+        R = int(RGB[0]*255 - shade_value*RGB[0]*255)
+        G = int(RGB[1]*255 - shade_value*RGB[1]*255)
+        B = int(RGB[2]*255 - shade_value*RGB[2]*255)
+        hexR = R.to_bytes(((R.bit_length() + 7) // 8),"big").hex()
+        hexG = G.to_bytes(((G.bit_length() + 7) // 8),"big").hex()
+        hexB = B.to_bytes(((B.bit_length() + 7) // 8),"big").hex()
+        shaded_color = '#{0}{1}{2}'.format(hexR,hexG,hexB)
+        return shaded_color
 
     def plot_orbits(self,ax,objects,refresh_canvas=True,refplane_var = 1):
         '''plots orbits, positions and annotations'''
 
         self.ax.cla()
 
-        plt.rcParams['savefig.facecolor']= self.custom_color
+        # plt.rcParams['savefig.facecolor']= self.custom_color
         plt.rcParams['grid.color'] = self.gridcolor
         plt.rcParams['grid.linewidth'] = self.gridlinewidth
         self.fig.set(facecolor = self.custom_color)
@@ -640,26 +663,42 @@ class plot_application:
         ax.w_xaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
         ax.w_yaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
         ax.w_zaxis.set_pane_color(self.hex_to_rgb(self.pane_color))
-
         for object in objects:
             if None in object.orbit:
                 continue
             orbit = object.orbit
             pos = object.pos
+            object.orbit_artist= []
+            orbit_pos = np.array(orbit)
+            orbit_neg = np.array(orbit)
+            positive = orbit_pos[2] > 0
+            negative = orbit_pos[2] <= 0
+            orbit_neg[0][negative] = np.nan
+            orbit_neg[1][negative] = np.nan
+            orbit_neg[2][negative] = np.nan
+
+            orbit_pos[0][positive] = np.nan
+            orbit_pos[1][positive] = np.nan
+            orbit_pos[2][positive] = np.nan
+
             if object.color == None:
-                object.orbit_artist = ax.plot(orbit[0],orbit[1],orbit[2],linewidth=self.orbit_linewidth,clip_on=False)
+                color = next(self.ax._get_lines.prop_cycler)['color']
+                object.color = color
+                object.orbit_artist.append(ax.plot(orbit_neg[0],orbit_neg[1],orbit_neg[2],linewidth=self.orbit_linewidth,clip_on=False,color=object.color))
+                object.orbit_artist.append(ax.plot(orbit_pos[0],orbit_pos[1],orbit_pos[2],linewidth=self.orbit_linewidth,clip_on=False,color=self.shade_hex_color(object.color)))
+
             else:
-                object.orbit_artist = ax.plot(orbit[0],orbit[1],orbit[2],color=object.color,linewidth=self.orbit_linewidth,clip_on=False)
+                object.orbit_artist.append(ax.plot(orbit_neg[0],orbit_neg[1],orbit_neg[2],linewidth=self.orbit_linewidth,clip_on=False,color=object.color))
+                object.orbit_artist.append(ax.plot(orbit_pos[0],orbit_pos[1],orbit_pos[2],linewidth=self.orbit_linewidth,clip_on=False,color=self.shade_hex_color(object.color)))
+
             if refplane_var == 1:
                      for x,y,z in zip(*object.orbit.tolist()):
                          ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
 
-            color = object.orbit_artist[0].get_color()
-            object.color = color
             if object.id == None:
-                object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='*', MarkerSize=self.markersize,MarkerFaceColor=color ,markeredgecolor = color ,clip_on=False,picker=5)
+                object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='*', MarkerSize=self.markersize,MarkerFaceColor=object.color ,markeredgecolor = object.color ,clip_on=False,picker=5)
             else:
-                object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=color ,markeredgecolor = color ,clip_on=False,picker=5)
+                object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='o', MarkerSize=self.markersize,MarkerFaceColor=object.color ,markeredgecolor = object.color ,clip_on=False,picker=5)
             object.annotation_artist = self.annotate3D(ax, s=object.displayname, xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,self.text_yoffset),textcoords='offset points', ha='center',va='bottom',color = self.text_color,clip_on=False)
             if self.annot_var.get() == 1:
                 self.annotate3D(ax, s=str(object.date), xyz=[pos[0],pos[1],pos[2]], fontsize=self.textsize, xytext=(self.text_xoffset,-self.text_yoffset),textcoords='offset points', ha='center',va='top',color = self.text_color,clip_on=False)
@@ -788,6 +827,7 @@ class plot_application:
         return True
 
     def toggle_axis(self):
+        ''' function to toggle coordinate axes'''
         if self.axis_var.get() == 1:
             self.ax.set_axis_on()
             self.canvas.draw()
@@ -822,6 +862,7 @@ class plot_application:
         self.artist_menu(selected_object)
 
     def artist_menu(self,object):
+        ''' popup menu to alter artist color and name or remove artist'''
         top = tkinter.Toplevel()
 
         x = root.winfo_x()
@@ -869,7 +910,8 @@ class plot_application:
 
     def remove_artist(self,object,top):
         object.position_artist[0].remove()
-        object.orbit_artist[0].remove()
+        for artist in object.orbit_artist:
+            artist[0].remove()
         object.annotation_artist.remove()
         index = 0
         for obj in self.current_objects:
@@ -1023,12 +1065,17 @@ class plot_application:
         delta_v2 = np.linalg.norm(v_2 - v_p2)
         ecc, inclination, Omega, omega, true_anomaly = self.kart2kep(r2,v_2)
         if not popup:
-            if inclination > np.pi/2:
-                return False,False,False,False,False
+            if self.pulse_direction_var.get() == 'prograde':
+                if inclination > np.pi/2:
+                    return False,False,False,False,False
+            elif self.pulse_direction_var.get() == 'retrograde':
+                if inclination <= np.pi/2:
+                    return False,False,False,False,False
         keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':true_anomaly,'a':a}
         return v_1, v_2, keplers, delta_v1, delta_v2
 
     def calc_rendezvous(self,selection1,selection2):
+        ''' function to calculate a rendeszvous orbit'''
         for object in self.current_objects:
             if object.displayname == selection1:
                 object1 = object
@@ -1065,6 +1112,7 @@ class plot_application:
         return
 
     def kart2kep(self,r,v):
+        ''' function to transform cartesian statevectors to kepler elements'''
         h = np.cross(r,v)
         h_norm = h / np.linalg.norm(h)
         ecc_vector = (np.cross(v,h)/self.GM_sun) - (r/np.linalg.norm(r))
@@ -1088,6 +1136,7 @@ class plot_application:
         return ecc, inclination, Omega, omega, true_anomaly
 
     def lambert_menu(self):
+        ''' menu to choose parameters for the lambert solver to plot a rendeszvous orbit'''
         choice_1_var = tkinter.StringVar()
         choice_2_var = tkinter.StringVar()
 
@@ -1141,6 +1190,11 @@ class plot_application:
         return
 
     def approx_timefree_dv(self,r1,r2,dt,starting_object):
+        ''' function to calculate an approximate dV of the lambert problem
+            MULTIPLE REVOLUTION LAMBERT´S TARGETING PROBLEM: AN ANALYTICAL
+            APPROXIMATION
+            by Claudio Bombardelli, Juan Luis Gonzalo, and Javier Roa
+        '''
         r1_norm = np.linalg.norm(r1)
         r2_norm = np.linalg.norm(r2)
         c = np.linalg.norm(r1-r2)
@@ -1158,9 +1212,11 @@ class plot_application:
         print(roots)
         return
 
-    def porkchop_menu(self):
-
+    def custom_object_menu(self):
+        ''' menu to choose custom object parameters'''
+        #validates an integer for tkinter entry
         def validate_int(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+
             if not value_if_allowed:
                 return True
             try:
@@ -1168,7 +1224,93 @@ class plot_application:
                 return True
             except ValueError:
                 return False
+        #validates an float for tkinter entry
+        def validate_float(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+            if not value_if_allowed:
+                return True
+            try:
+                float(value_if_allowed)
+                return True
+            except ValueError:
+                return False
 
+        top = tkinter.Toplevel(self.master)
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title("add custom object")
+        top.rowconfigure(0, weight=1)
+        top.columnconfigure(0, weight=1)
+
+        a_var = tkinter.StringVar()
+        ecc_var = tkinter.StringVar()
+        i_var = tkinter.StringVar()
+        omega_var = tkinter.StringVar()
+        OMEGA_var = tkinter.StringVar()
+        anomaly_var = tkinter.StringVar()
+        name_var = tkinter.StringVar()
+
+        kepler_frame = tkinter.Frame(top)
+        button_frame = tkinter.Frame(top)
+        button_frame.rowconfigure(0, weight=1)
+        button_frame.columnconfigure(0, weight=1)
+        vcmd_int = (button_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        vcmd_float = (button_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        kepler_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        button_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        #'excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance'
+        kepler_array = [ ['semimajor axis:' , 'AU', a_var] , ['numerical eccentricity:' , '', ecc_var] , ['inclination:' , 'degrees', i_var] , ['argument of periapsis:' , 'degrees', omega_var] , ['longitude of the ascending node:' , 'degrees', OMEGA_var], ['true anomaly' , 'degrees', anomaly_var]]
+        row_count = 0
+        for element in kepler_array:
+            tkinter.Label(kepler_frame,text=element[0]).grid(row=row_count,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
+            tkinter.Entry(kepler_frame,validate = 'key', validatecommand=vcmd_float,textvariable=element[2]).grid(row=row_count,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+            tkinter.Label(kepler_frame,text=element[1]).grid(row=row_count,column=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+            row_count = row_count + 1
+        tkinter.Label(kepler_frame,text='displayname').grid(row=row_count,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
+        tkinter.Entry(kepler_frame,validate = 'key',textvariable=name_var).grid(row=row_count,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        tkinter.Label(kepler_frame,text='').grid(row=row_count,column=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+
+        tkinter.Button(button_frame,text='add to plot',command= lambda: self.add_custom_object(a_var,ecc_var,i_var,omega_var,OMEGA_var,anomaly_var,name_var,top)).grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        tkinter.Button(button_frame,text='close',command= lambda: top.destroy() ).grid(row=0,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+
+        top.transient(self.master)
+        top.resizable(width=False,height=False)
+        return
+
+    def add_custom_object(self,a,ecc,i,omega,Omega,true_anomaly,name,top):
+        ''' function to add a custom object to the current object list'''
+        top.destroy()
+        a = float(a.get())
+        ecc = float(ecc.get())
+        i =  np.deg2rad(float(i.get()))
+        omega =  np.deg2rad(float(omega.get()))
+        Omega =  np.deg2rad(float(Omega.get()))
+        true_anomaly =  np.deg2rad(float(true_anomaly.get()))
+        name = name.get()
+        keplers = {'eccentricity' : ecc, 'a' : a, 'inclination' : i , 'omega' : omega, 'Omega' : Omega, 'true_anomaly' : true_anomaly}
+        orbit = self.orbit_position(a,ecc,Omega,i,omega,comp_true_anomaly=true_anomaly)
+        position = self.orbit_position(a,ecc,Omega,i,omega,[true_anomaly])
+        keplers = {'eccentricity' : ecc, 'a' : a, 'inclination' : i , 'omega' : omega, 'Omega' : Omega, 'true_anomaly' : true_anomaly}
+        custom_object = celestial_artist('',orbit,position,'',name,'custom object added by user',keplers)
+        self.current_objects.append(custom_object)
+        self.redraw_current_objects()
+
+        return
+
+    def porkchop_menu(self):
+        ''' popup menu to choose parameters for porkchop plot generation'''
+
+        #validates an integer for tkinter entry
+        def validate_int(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+
+            if not value_if_allowed:
+                return True
+            try:
+                int(value_if_allowed)
+                return True
+            except ValueError:
+                return False
+        #validates an float for tkinter entry
         def validate_float(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
             if not value_if_allowed:
                 return True
@@ -1192,6 +1334,10 @@ class plot_application:
         interpolation_list = ['none', 'nearest', 'bilinear', 'bicubic', 'spline16', 'spline36', 'hanning', 'hamming', 'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian', 'bessel', 'mitchell', 'sinc', 'lanczos']
         interpolation_var = tkinter.StringVar()
         interpolation_var.set('bilinear')
+        pulse_direction_options = [('prograde','prograde') , ('retrograde','retrograde') , ('both', 'both')]
+        dV_options = [('launch','launch') , ('arrival' , 'arrival') , ('both','both')]
+
+
         choice_list = []
         for object in self.current_objects:
             choice_list.append(object.displayname)
@@ -1210,12 +1356,10 @@ class plot_application:
         top.rowconfigure(0, weight=1)
         top.columnconfigure(0, weight=1)
         dropdown_frame = tkinter.Frame(top)
-        info_frame = tkinter.Frame(top)
         button_frame = tkinter.Frame(top)
         dropdown_frame.columnconfigure(0, weight=1)
-        info_frame.columnconfigure(0, weight=1)
         dropdown_frame.rowconfigure(0, weight=1)
-        info_frame.rowconfigure(0, weight=1)
+
 
         dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
         object_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
@@ -1227,6 +1371,8 @@ class plot_application:
         misc_frame = tkinter.LabelFrame(dropdown_frame,text='advanced settings',pady=5,padx=5)
         misc_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E)
         misc_frame.columnconfigure(0,weight=1)
+
+
         vcmd_int = (dropdown_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         vcmd_float = (dropdown_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         button_frame.grid(row=2,column=0)
@@ -1259,15 +1405,37 @@ class plot_application:
         iteration_entry.grid(row=2,column=2, sticky = tkinter.E)
         tolerance_entry.grid(row=3,column=2,sticky=tkinter.E)
 
+        #############radiobuttons###############
+        pulse_frame = tkinter.LabelFrame(misc_frame, text= 'pulse direction')
+        # pulse_frame.columnconfigure(0,weight=1)
+        pulse_frame.grid(row = 4 ,column = 0, columnspan = 3,sticky= tkinter.W )
+        count = 0
+        for text,mode in pulse_direction_options:
+            b = tkinter.Radiobutton(pulse_frame,text=text,variable = self.pulse_direction_var , value = mode)
+            b.grid(row=0 , column=count)
+            self.porkchop_radiobuttons.append(b)
+            count = count + 1
+        dV_frame = tkinter.LabelFrame(misc_frame,text = 'delta-V')
+        # dV_frame.columnconfigure(0,weight=1)
+        dV_frame.grid(row = 5,column = 0, columnspan = 3,sticky= tkinter.W )
+        count=0
+        for text,mode in dV_options:
+            b = tkinter.Radiobutton(dV_frame, text=text,variable= self.dV_var , value = mode)
+            b.grid(row=0, column = count )
+            self.porkchop_radiobuttons.append(b)
+            count = count + 1
+        #######################################
+
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get(), int(iteration_var.get()), float(tolerance_var.get())))
+        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get(), int(iteration_var.get()), float(tolerance_var.get()) , top))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
         top.resizable(width=False,height=False)
         top.transient(self.master)
 
-    def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation,iterations,tolerance):
-
+    def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation,iterations,tolerance,top):
+        ''' function to calculate porkchop plot and plot the array as heatmap'''
+        top.destroy()
         for object in self.current_objects:
             if object.displayname == selection1:
                 object1 = object
@@ -1284,6 +1452,8 @@ class plot_application:
         self.prog_bar["value"] = 0
         self.prog_bar["maximum"] = len(vectors1)
         print('calculating ...')
+        # for button in self.porkchop_radiobuttons:
+        #     button.configure(state= 'disabled')
         for vector1 in vectors1:
             for vector2 in vectors2:
                 date_vector1 = datetime.datetime.strptime(vector1[1],"A.D.%Y-%b-%d00:00:00.0000")
@@ -1302,11 +1472,20 @@ class plot_application:
             self.prog_bar.update()
             counter1 = counter1 + 1
             counter2 = 0
+        # for button in self.porkchop_radiobuttons:
+        #     button.configure(state= 'normal')
+
         date_list = [datetime.datetime.strptime(vector[1],"A.D.%Y-%b-%d00:00:00.0000") for vector in vectors1 ]
         date_list = mdates.date2num(date_list)
         dV_array_depart = dV_array_depart * self.AUinKM
         dV_array_arrival = dV_array_arrival * self.AUinKM
         print('done!')
+        if self.dV_var.get() == 'launch':
+            dV_array = dV_array_depart
+        elif self.dV_var.get() == 'arrival':
+            dV_array = dV_array_arrival
+        else:
+            dV_array = dV_array_depart + dV_array_arrival
         porkchop_frame =  ttk.Frame(self.notebook)
         porkchop_frame.rowconfigure(0,weight=1)
         porkchop_frame.columnconfigure(0,weight=1)
@@ -1335,7 +1514,8 @@ class plot_application:
         toolbar = NavigationToolbar2Tk(canvas,toolbarframe)
         tkinter.Button(close_button_frame,text='close',command= lambda: self.notebook.forget(self.notebook.select())).grid(row=0,column=1,sticky=tkinter.E)
         ax = fig.gca()
-        im = ax.imshow(dV_array_depart,origin='lower',cmap='jet',interpolation = interpolation,vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
+        im = ax.imshow(dV_array,origin='lower',cmap='jet',interpolation = interpolation,vmin=0,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
+        # im = ax.contour(dV_array,origin='lower',cmap='jet',vmin=2,vmax = 15, extent = [date_list[0] , date_list[-1] , date_list[0] , date_list[-1]])
         ax.xaxis_date()
         ax.yaxis_date()
         ax.xaxis.set_major_locator(LinearLocator())
@@ -1365,6 +1545,7 @@ class plot_application:
         return
 
     def request_vector_timerange(self,id,date1,date2,resolution,errors=0):
+        ''' function to request a timerange of ephemerides of one object from the JPL horizons DB as cartesian state vectors'''
         batchfile = self.batchfile_timerange
         batchfile['COMMAND'] = str(id)
         batchfile['START_TIME'] = "'"+str(date1)+"'"
@@ -1387,6 +1568,7 @@ class plot_application:
         return vectors
 
     def kep2velocity(self,object):
+        ''' function to calculate the velocity-vector of an object from its kepler elements'''
         ecc = object.keplers['excentricity']
         true_anomaly = object.keplers['true_anomaly']
         a = object.keplers['a']
