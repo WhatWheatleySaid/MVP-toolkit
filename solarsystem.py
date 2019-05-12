@@ -32,94 +32,6 @@ from tkinter import filedialog
 # import io
 # from PIL import Image
 
-class CustomNotebook(ttk.Notebook):
-    """A ttk Notebook with close buttons on each tab"""
-
-    __initialized = False
-
-    def __init__(self, *args, **kwargs):
-        if not self.__initialized:
-            self.__initialize_custom_style()
-            self.__inititialized = True
-
-        kwargs["style"] = "CustomNotebook"
-        ttk.Notebook.__init__(self, *args, **kwargs)
-
-        self._active = None
-
-        self.bind("<ButtonPress-1>", self.on_close_press, True)
-        self.bind("<ButtonRelease-1>", self.on_close_release)
-
-    def on_close_press(self, event):
-        """Called when the button is pressed over the close button"""
-
-        element = self.identify(event.x, event.y)
-
-        if "close" in element:
-            index = self.index("@%d,%d" % (event.x, event.y))
-            self.state(['pressed'])
-            self._active = index
-
-    def on_close_release(self, event):
-        """Called when the button is released over the close button"""
-        if not self.instate(['pressed']):
-            return
-
-        element =  self.identify(event.x, event.y)
-        index = self.index("@%d,%d" % (event.x, event.y))
-
-        if "close" in element and self._active == index:
-            self.forget(index)
-            self.event_generate("<<NotebookTabClosed>>")
-
-        self.state(["!pressed"])
-        self._active = None
-
-    def __initialize_custom_style(self):
-        style = ttk.Style()
-        self.images = (
-            tkinter.PhotoImage("img_close", data='''
-                R0lGODlhCAAIAMIBAAAAADs7O4+Pj9nZ2Ts7Ozs7Ozs7Ozs7OyH+EUNyZWF0ZWQg
-                d2l0aCBHSU1QACH5BAEKAAQALAAAAAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU
-                5kEJADs=
-                '''),
-            tkinter.PhotoImage("img_closeactive", data='''
-                R0lGODlhCAAIAMIEAAAAAP/SAP/bNNnZ2cbGxsbGxsbGxsbGxiH5BAEKAAQALAAA
-                AAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU5kEJADs=
-                '''),
-            tkinter.PhotoImage("img_closepressed", data='''
-                R0lGODlhCAAIAMIEAAAAAOUqKv9mZtnZ2Ts7Ozs7Ozs7Ozs7OyH+EUNyZWF0ZWQg
-                d2l0aCBHSU1QACH5BAEKAAQALAAAAAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU
-                5kEJADs=
-            ''')
-        )
-
-        style.element_create("close", "image", "img_close",
-                            ("active", "pressed", "!disabled", "img_closepressed"),
-                            ("active", "!disabled", "img_closeactive"), border=8, sticky='')
-        style.layout("CustomNotebook", [("CustomNotebook.client", {"sticky": "nswe"})])
-        style.layout("CustomNotebook.Tab", [
-            ("CustomNotebook.tab", {
-                "sticky": "nswe",
-                "children": [
-                    ("CustomNotebook.padding", {
-                        "side": "top",
-                        "sticky": "nswe",
-                        "children": [
-                            ("CustomNotebook.focus", {
-                                "side": "top",
-                                "sticky": "nswe",
-                                "children": [
-                                    ("CustomNotebook.label", {"side": "left", "sticky": ''}),
-                                    ("CustomNotebook.close", {"side": "left", "sticky": ''}),
-                                ]
-                        })
-                    ]
-                })
-            ]
-        })
-    ])
-
 class celestial_artist:
     def __init__(self,id,orbit,pos,date,name,text,keplers):
         self.id = id
@@ -159,6 +71,8 @@ class plot_application:
         self.equinox_artists = []
         self.list = []
         self.current_objects = []
+        self.sun = celestial_artist(0,None,[0,0,0],None,'sun','sun',None)
+        self.current_center_object = self.sun
 
         #variables for porkchop menu
         self.pulse_direction_var = tkinter.StringVar()
@@ -169,7 +83,7 @@ class plot_application:
 
 
         self.default_colors = ['#191919','#7f7f7f','#ffffff','#000000']
-        self.resolution = 500
+        self.resolution = 800
         self.set_default_colors()
         self.gridlinewidth = 0.2
         self.textsize = 8
@@ -267,6 +181,9 @@ class plot_application:
         self.xyzview_button = tkinter.Button(master=self.viewbuttons_frame,text='XYZ',borderwidth = 3,command=lambda:self.change_view('XYZ'))
         self.xyzview_button.configure(width=3,height=1)
         self.xyzview_button.grid(row=0,column=3)
+        self.sun_button = tkinter.Button(master=self.viewbuttons_frame,text='sun',borderwidth = 3,command=lambda:self.set_camera_center([0,0,0]))
+        self.sun_button.configure(width=3,height=1)
+        self.sun_button.grid(row=0,column=4)
 
 
         self.listbox = tkinter.Listbox(master=self.master,selectmode=tkinter.MULTIPLE,exportselection=False)
@@ -692,8 +609,11 @@ class plot_application:
                 object.orbit_artist.append(ax.plot(orbit_pos[0],orbit_pos[1],orbit_pos[2],linewidth=self.orbit_linewidth,clip_on=False,color=self.shade_hex_color(object.color)))
 
             if refplane_var == 1:
-                     for x,y,z in zip(*object.orbit.tolist()):
-                         ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
+                counter = 0
+                for x,y,z in zip(*object.orbit.tolist()):
+                    if (counter%10 == 0):
+                        ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
+                    counter = counter + 1
 
             if object.id == None:
                 object.position_artist = self.ax.plot(pos[0],pos[1],pos[2], marker='*', MarkerSize=self.markersize,MarkerFaceColor=object.color ,markeredgecolor = object.color ,clip_on=False,picker=5)
@@ -709,13 +629,7 @@ class plot_application:
         # # ax.autoscale(True)
         #
         self.axisEqual3D(ax)
-        ylim = np.max(np.abs(self.ax.get_ylim()))
-        xlim = np.max(np.abs(self.ax.get_xlim()))
-        zlim = np.max(np.abs(self.ax.get_zlim()))
-        max = np.amax([ylim,xlim,zlim])
-        self.ax.set_ylim([-max, max])
-        self.ax.set_xlim([-max, max])
-        self.ax.set_zlim([-max, max])
+        self.set_camera_center(self.current_center_object.pos)
 
         # self.formatter.set_scientific(True)
         # self.ax.xaxis.set_major_formatter(self.formatter)
@@ -854,12 +768,31 @@ class plot_application:
             if object.position_artist[0].get_label() == event.artist.get_label():
                 name= object.name
                 selected_object = object
-                pprint('clicked {0}'.format(name))
-        for object in self.current_objects:
-            object.position_artist[0].set_markeredgecolor(object.position_artist[0].get_markerfacecolor())
-        selected_object.position_artist[0].set_markeredgecolor('white')
+        print('clicked {0}'.format(name))
+        # for object in self.current_objects:
+        #     object.position_artist[0].set_markeredgecolor(object.position_artist[0].get_markerfacecolor())
+        # selected_object.position_artist[0].set_markeredgecolor('white')
+        if event.mouseevent.button == 1:
+            self.current_center_object = selected_object
+            self.set_camera_center(selected_object.pos)
+        elif event.mouseevent.button == 3:
+            self.artist_menu(selected_object)
+
+    def set_camera_center(self,pos):
+        '''centers camera around [x,y,z]'''
+        if np.array_equal(pos,[0,0,0]):
+            self.current_center_object = self.sun
+        ylim = self.ax.get_ylim()
+        xlim = self.ax.get_xlim()
+        zlim = self.ax.get_zlim()
+        xlim = xlim[1]-xlim[0]
+        ylim = ylim[1]-ylim[0]
+        zlim = zlim[1]-zlim[0]
+        max = np.amax([ylim,xlim,zlim])/2
+        self.ax.set_xlim([-max+pos[0], max+pos[0]])
+        self.ax.set_ylim([-max+pos[1], max+pos[1]])
+        self.ax.set_zlim([-max+pos[2], max+pos[2]])
         self.canvas.draw()
-        self.artist_menu(selected_object)
 
     def artist_menu(self,object):
         ''' popup menu to alter artist color and name or remove artist'''
@@ -1249,18 +1182,22 @@ class plot_application:
         OMEGA_var = tkinter.StringVar()
         anomaly_var = tkinter.StringVar()
         name_var = tkinter.StringVar()
-
-        kepler_frame = tkinter.Frame(top)
+        name_frame = tkinter.Frame(top,pady=10)
+        kepler_frame = tkinter.LabelFrame(top,text='kepler elements',pady=10,padx=5)
         button_frame = tkinter.Frame(top)
+        name_frame.rowconfigure(0, weight=1)
+        name_frame.columnconfigure(0, weight=1)
         button_frame.rowconfigure(0, weight=1)
         button_frame.columnconfigure(0, weight=1)
         kepler_frame.rowconfigure(0, weight=1)
         kepler_frame.columnconfigure(0, weight=1)
         vcmd_int = (button_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         vcmd_float = (button_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        kepler_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        button_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        #'excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance'
+        name_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        kepler_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        button_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        tkinter.Label(name_frame,text='displayname').grid(row=0,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
+        tkinter.Entry(name_frame,validate = 'key',textvariable=name_var).grid(row=0,column=1,columnspan=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
         kepler_array = [ ['semimajor axis:' , 'AU', a_var] , ['numerical eccentricity:' , '', ecc_var] , ['inclination:' , 'degrees', i_var] , ['argument of periapsis:' , 'degrees', omega_var] , ['longitude of the ascending node:' , 'degrees', OMEGA_var], ['true anomaly' , 'degrees', anomaly_var]]
         row_count = 0
         for element in kepler_array:
@@ -1268,9 +1205,7 @@ class plot_application:
             tkinter.Entry(kepler_frame,validate = 'key', validatecommand=vcmd_float,textvariable=element[2]).grid(row=row_count,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
             tkinter.Label(kepler_frame,text=element[1]).grid(row=row_count,column=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
             row_count = row_count + 1
-        tkinter.Label(kepler_frame,text='displayname').grid(row=row_count,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
-        tkinter.Entry(kepler_frame,validate = 'key',textvariable=name_var).grid(row=row_count,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        tkinter.Label(kepler_frame,text='').grid(row=row_count,column=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+
 
         tkinter.Button(button_frame,text='add to plot',command= lambda: self.add_custom_object(a_var,ecc_var,i_var,omega_var,OMEGA_var,anomaly_var,name_var,top)).grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
         tkinter.Button(button_frame,text='close',command= lambda: top.destroy() ).grid(row=0,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
