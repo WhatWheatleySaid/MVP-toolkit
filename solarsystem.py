@@ -45,6 +45,8 @@ class celestial_artist:
         self.name = name
         self.displayname = name
         self.info_text = text
+        self.moon = False
+        self.center_body = [0,0,0] #sun in this referencesystem
 
         self.keplers = keplers
 
@@ -650,8 +652,11 @@ class plot_application:
             self.canvas.draw()
         return # marker_artists,orbit_colors,dates
 
+    def ask_ok_popup(self, title, question):
+        return tkinter.messagebox.askokcancel(title, question)
+
     def on_closing(self):
-        if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
+        if self.ask_ok_popup("Quit", "Do you want to quit?"):
             self.master.quit()
 
     def error_message(self,title,message):
@@ -665,10 +670,25 @@ class plot_application:
         positions = []
         kepler_dict = {}
         self.prog_bar["maximum"] = len(objects)
-
+        moon = False
         count = 0
+        objects = sorted(objects,reverse=True)
         for object in objects:
             batchfile['COMMAND'] = object
+            object_stripped = object.strip("'")
+            if len(object_stripped) == 3:
+                if int(object_stripped[1:3]) != 99:
+                    #its a moon, query with centerbody instead of sun
+                    # x99 is majorbody with x 1 to 9 representing mercury, venus, earth, mars .... , x01 is first moon of x, x02 second,...
+                    center_body =  "'" + object_stripped[0] + "99'"
+                    batchfile['CENTER'] = "'500@" + center_body[1:5]
+                    moon = True
+
+                else:
+                    #no moon! reset to sun as center
+                    batchfile['CENTER'] = "'500@10'"
+                    moon = False
+
             self.dt = self.calendar_widget.selection_get()
             batchfile['TLIST'] = "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
             try:
@@ -723,8 +743,22 @@ class plot_application:
                 orbits.append(orbit)
                 positions.append(position)
 
-            '''celestial artist : def __init__(self,id,artist,orbit,pos,date,color,name):'''
+            if moon:
+                for obj in self.current_objects:
+                    if obj.id == center_body:
+                        orbit = orbit + obj.pos
+                        position = position + obj.pos
+                        found = True
+                        break
+                    else:
+                        found = False
+                if not found:
+                    #if self.ask_ok_popup("Centerbody Missing", "The centerbody of the queried moon is not currently on the Plot, add it to the query list?"):
+                    self.error_message('centerbody missing','The center object of the moon {0} is missing, skipping'.format(self.JPL_numbers[object]))
+                    continue
+
             self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,kepler_dict))
+            self.current_objects[-1].moon = moon
         return orbits,positions
 
     def update_listbox(self):
@@ -779,7 +813,7 @@ class plot_application:
             self.artist_menu(selected_object)
 
     def set_camera_center(self,pos):
-        '''centers camera around [x,y,z]'''
+        '''centers camera around pos = [x,y,z]'''
         if np.array_equal(pos,[0,0,0]):
             self.current_center_object = self.sun
         ylim = self.ax.get_ylim()
