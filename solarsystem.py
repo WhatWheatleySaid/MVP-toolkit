@@ -773,6 +773,7 @@ class plot_application:
                 orbits.append(orbit)
                 positions.append(position)
             added = False
+            found = False
             if moon:
                 for obj in self.current_objects:
                     if obj.id == center_body:
@@ -781,19 +782,16 @@ class plot_application:
                         position = position + parent_position
                         found = True
                         break
-                    else:
-                        found = False
                 if not found:
                     if self.ask_ok_popup("Centerbody Missing", "The centerbody of the queried moon is not currently on the plot, add it to the query list?"):
                         objects.append("'" + object_stripped[0] + "99'")
-                        objects.append(object)
-                        added = True
+                        return self.request_keplers(objects,self.batchfile)
                     else:
                         continue
-            if not added:
-                self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,kepler_dict))
-                self.current_objects[-1].moon = moon
-                self.current_objects[-1].center_body = parent_position
+
+            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,kepler_dict))
+            self.current_objects[-1].moon = moon
+            self.current_objects[-1].center_body = parent_position
         return orbits,positions
 
     def update_listbox(self):
@@ -911,7 +909,31 @@ class plot_application:
         root.tk.call('wm','iconphoto',top._w,icon_img)
 
     def remove_artist(self,object,top):
-        object.position_artist[0].remove()
+        try:
+            object.position_artist[0].remove()
+        except ValueError:
+            top.destroy()
+            self.error_message('Artist error','Object is already removed!')
+            return
+        stripped_id = object.id.strip("'")
+        
+        #check if object has moons on plot and remove them first
+        if (len(stripped_id) == 3) and (stripped_id[1:3] == '99'):
+            for obj in self.current_objects:
+                if (stripped_id[0] == obj.id.strip("'")[0]) and (not(obj.id.strip("'")[1:3] == '99')):
+                    print('found moon {0}, removing it together with {1}'.format(obj.displayname,object.displayname))
+                    obj.position_artist[0].remove()
+                    for art in obj.orbit_artist:
+                        art[0].remove()
+                    obj.annotation_artist.remove()
+                    index = 0
+                    for o in self.current_objects:
+                        if o.position_artist[0].get_label() == obj.position_artist[0].get_label():
+                            self.current_objects.pop(index)
+                            break
+                        index = index + 1
+
+        #remove artist
         for artist in object.orbit_artist:
             artist[0].remove()
         object.annotation_artist.remove()
