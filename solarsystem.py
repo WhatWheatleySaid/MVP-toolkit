@@ -85,7 +85,7 @@ class plot_application:
 
 
         self.default_colors = ['#191919','#7f7f7f','#ffffff','#000000']
-        self.resolution = 800
+        self.resolution = 1600
         self.set_default_colors()
         self.gridlinewidth = 0.2
         self.textsize = 8
@@ -315,7 +315,7 @@ class plot_application:
         # self.axis_visibility(None,'z',True)
         # self.axis_visibility(None,'y',True)
 
-        '''does weird stuff with the image (atrifacts)'''
+        '''does weird stuff with the image (artifacts)'''
         # ps = self.canvas.get_tk_widget().postscript(colormode='color')
         # img = Image.open(io.BytesIO(ps.encode('utf-8')))
         # img.save(dir)
@@ -588,10 +588,14 @@ class plot_application:
             orbit = object.orbit
             pos = object.pos
             object.orbit_artist= []
+            if object.moon:
+                threshold = object.center_body[2]
+            else:
+                threshold = 0
             orbit_pos = np.array(orbit)
             orbit_neg = np.array(orbit)
-            positive = orbit_pos[2] > 0
-            negative = orbit_pos[2] <= 0
+            positive = orbit_pos[2] > threshold
+            negative = orbit_pos[2] <= threshold
             orbit_neg[0][negative] = np.nan
             orbit_neg[1][negative] = np.nan
             orbit_neg[2][negative] = np.nan
@@ -613,8 +617,8 @@ class plot_application:
             if refplane_var == 1:
                 counter = 0
                 for x,y,z in zip(*object.orbit.tolist()):
-                    if (counter%10 == 0):
-                        ax.plot([x,x],[y,y],[z,0],'white',linewidth=self.refplane_linewidth,clip_on=False)
+                    if (counter%20 == 0):
+                        ax.plot([x,x],[y,y],[z,threshold],'white',linewidth=self.refplane_linewidth,clip_on=False)
                     counter = counter + 1
 
             if object.id == None:
@@ -676,6 +680,7 @@ class plot_application:
         for object in objects:
             batchfile['COMMAND'] = object
             object_stripped = object.strip("'")
+            parent_position = [0,0,0]
             if len(object_stripped) == 3:
                 if int(object_stripped[1:3]) != 99:
                     #its a moon, query with centerbody instead of sun
@@ -742,23 +747,28 @@ class plot_application:
                 position = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'],[kepler_dict['true_anomaly']])
                 orbits.append(orbit)
                 positions.append(position)
-
+            added = False
             if moon:
                 for obj in self.current_objects:
                     if obj.id == center_body:
                         orbit = orbit + obj.pos
-                        position = position + obj.pos
+                        parent_position = obj.pos
+                        position = position + parent_position
                         found = True
                         break
                     else:
                         found = False
                 if not found:
-                    #if self.ask_ok_popup("Centerbody Missing", "The centerbody of the queried moon is not currently on the Plot, add it to the query list?"):
-                    self.error_message('centerbody missing','The center object of the moon {0} is missing, skipping'.format(self.JPL_numbers[object]))
-                    continue
-
-            self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,kepler_dict))
-            self.current_objects[-1].moon = moon
+                    if self.ask_ok_popup("Centerbody Missing", "The centerbody of the queried moon is not currently on the Plot, add it to the query list?"):
+                        objects.append("'" + object_stripped[0] + "99'")
+                        objects.append(object)
+                        added = True
+                    else:
+                        continue
+            if not added:
+                self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,kepler_dict))
+                self.current_objects[-1].moon = moon
+                self.current_objects[-1].center_body = parent_position
         return orbits,positions
 
     def update_listbox(self):
