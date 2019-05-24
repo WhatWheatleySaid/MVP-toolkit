@@ -156,7 +156,9 @@ class plot_application:
         self.menubar = tkinter.Menu(self.master)
         self.filemenu = tkinter.Menu(self.menubar,tearoff = 0)
 
-        self.filemenu.add_command(label="save figure as", command=self.save_file_as)
+        self.filemenu.add_command(label="export figure as", command=self.save_file_as)
+        self.filemenu.add_command(label="save plot", command=self.save_object_list)
+        self.filemenu.add_command(label="load plot", command=self.load_object_list)
         self.filemenu.add_command(label="preferences", command=self.preferences_menu)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.master.quit)
@@ -319,6 +321,15 @@ class plot_application:
         # ps = self.canvas.get_tk_widget().postscript(colormode='color')
         # img = Image.open(io.BytesIO(ps.encode('utf-8')))
         # img.save(dir)
+
+    def save_object_list(self):
+        dir = filedialog.asksaveasfilename(filetypes = [("pickle files","*.pckl")])
+        self.save_obj(self.current_objects,dir=dir)
+
+    def load_object_list(self):
+        dir = filedialog.askopenfilename(filetypes = [("pickle files","*.pckl")])
+        self.current_objects = self.load_obj(dir=dir)
+        self.redraw_current_objects()
 
     def get_color(self,b,parent):
         color=askcolor(b.cget('bg'),parent=parent)
@@ -501,13 +512,21 @@ class plot_application:
         for ctr, dim in zip(centers, 'xyz'):
             getattr(ax, 'set_{}lim'.format(dim))(ctr - r, ctr + r)
 
-    def save_obj(self,obj, name ):
-        with open('./'+ name + '.pkl', 'wb') as f:
-            pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+    def save_obj(self,obj, name=None, dir = None ):
+        if dir == None:
+            with open('./' + name + '.pkl', 'wb') as f:
+                pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+        else:
+            with open(dir , 'wb') as f:
+                pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
-    def load_obj(self,name):
-        with open('./' + name + '.pkl', 'rb') as f:
-            return pickle.load(f)
+    def load_obj(self,name=None, dir = None):
+        if dir == None:
+            with open('./' + name + '.pkl', 'rb') as f:
+                return pickle.load(f)
+        else:
+            with open(dir , 'rb') as f:
+                return pickle.load(f)
 
     def _quit(self):
         self.master.quit()     # stops mainloop
@@ -759,7 +778,7 @@ class plot_application:
                     else:
                         found = False
                 if not found:
-                    if self.ask_ok_popup("Centerbody Missing", "The centerbody of the queried moon is not currently on the Plot, add it to the query list?"):
+                    if self.ask_ok_popup("Centerbody Missing", "The centerbody of the queried moon is not currently on the plot, add it to the query list?"):
                         objects.append("'" + object_stripped[0] + "99'")
                         objects.append(object)
                         added = True
