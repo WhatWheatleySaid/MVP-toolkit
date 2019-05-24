@@ -96,6 +96,8 @@ class plot_application:
         self.text_yoffset = 4
         self.check_config()
 
+        self.valid_format_list = ['png','jpeg', 'jpg', 'svg', 'pdf', 'pgf',  'ps', 'raw', 'rgba', 'eps', 'svgz', 'tif', 'tiff']
+        self.valid_formats = [('','*.'+format) for format in self.valid_format_list]
         self.view_cid = None
         self.formatter = ScalarFormatter(useMathText=True,useOffset=True)
         self.dt = datetime.datetime.now()
@@ -307,13 +309,17 @@ class plot_application:
 
     def save_file_as(self):
         '''saves figure (currently redraws figure and toggles visibility of axis to true)'''
-        dir = filedialog.asksaveasfilename(defaultextension=".png")
+        dir = filedialog.asksaveasfilename(defaultextension=".png", filetypes = self.valid_formats)
         if dir == '' or dir == ():
             return
-        print(dir)
         self.fig.canvas.mpl_disconnect(self.view_cid)
         plt.sca(self.ax)
-        plt.savefig(dir,facecolor=self.custom_color)
+        try:
+            plt.savefig(dir,facecolor=self.custom_color)
+            print(dir)
+        except ValueError:
+            self.error_message('unsupported format','Supported formats are :\n {0}'.format( str(self.valid_format_list).strip('[').strip(']') ))
+
         # self.axis_visibility(None,'z',True)
         # self.axis_visibility(None,'y',True)
 
