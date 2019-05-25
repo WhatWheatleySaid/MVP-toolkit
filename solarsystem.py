@@ -491,14 +491,25 @@ class plot_application:
             r = np.matmul(self.rot_x(i),r)
             r = np.matmul(self.rot_z(Omega),r)
         elif e >1:
-            if comp_true_anomaly > 2:
-                plot_range = 3*np.pi/4
-                if plot_range < np.abs(comp_true_anomaly):
-                    plot_range = np.abs(comp_true_anomaly)
+            # if comp_true_anomaly > 2:
+            #     print('first case')
+            #     plot_range = 3*np.pi/4
+            #     if plot_range <= np.abs(comp_true_anomaly):
+            #         plot_range = np.abs(comp_true_anomaly)
+            # else:
+            #     print('second case')
+            #     plot_range = 3/4 * np.pi -np.pi
+            #     if plot_range > np.abs(comp_true_anomaly):
+            #         plot_range = np.abs(comp_true_anomaly)
+
+            if comp_true_anomaly >= 3*np.pi/4:
+                if comp_true_anomaly > np.pi:
+                    plot_range = np.abs(comp_true_anomaly - 2*np.pi)
+                    # plot_range = np.arccos(-1/e)
+                else:
+                    plot_range = comp_true_anomaly
             else:
-                plot_range = 3/4 * np.pi -np.pi
-                if plot_range > np.abs(comp_true_anomaly):
-                    plot_range = np.abs(comp_true_anomaly)
+                plot_range = 3*np.pi/4
             nu = np.linspace(-plot_range,plot_range,self.resolution)
             p = a * (1-(e**2))
             r = p/(1+e*np.cos(nu))
@@ -916,7 +927,7 @@ class plot_application:
             self.error_message('Artist error','Object is already removed!')
             return
         stripped_id = object.id.strip("'")
-        
+
         #check if object has moons on plot and remove them first
         if (len(stripped_id) == 3) and (stripped_id[1:3] == '99'):
             for obj in self.current_objects:
