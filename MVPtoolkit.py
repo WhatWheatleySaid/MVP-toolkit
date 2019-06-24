@@ -118,7 +118,7 @@ class plot_application:
 
         self.fig = plt.figure(facecolor = self.custom_color)
         self.fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99)
-        self.master.wm_title("JPL horizons DB visualisation")
+        self.master.wm_title("MVP toolkit - Mission Visualisation and Planning")
         self.notebook_frame = ttk.Frame(self.master,borderwidth=2)
         self.notebook_frame.grid(row=0,column=0,columnspan=10,rowspan=12,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
         self.notebook_frame.columnconfigure(0,weight=1)
