@@ -21,7 +21,7 @@ from tkinter import ttk
 import operator
 import csv
 import configparser,ast
-# from pykep import lambert_problem
+from pykep import lambert_problem
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.ticker import ScalarFormatter
@@ -169,6 +169,7 @@ class plot_application:
         self.tools_menu.add_command(label='calculate rendezvous (lambert solver)', command=self.lambert_menu)
         self.tools_menu.add_command(label='generate porkchop-plot', command=self.porkchop_menu)
         self.tools_menu.add_command(label='add custom object', command=self.custom_object_menu)
+        self.tools_menu.add_command(label='plot linear distance over time', command=self.distance_menu)
 
         self.menubar.add_cascade(label='File',menu=self.filemenu)
         self.menubar.add_cascade(label='Tools',menu=self.tools_menu)
@@ -330,10 +331,14 @@ class plot_application:
 
     def save_object_list(self):
         dir = filedialog.asksaveasfilename(filetypes = [("pickle files","*.pckl")])
+        if dir == '' or dir == ():
+            return
         self.save_obj(self.current_objects,dir=dir)
 
     def load_object_list(self):
         dir = filedialog.askopenfilename(filetypes = [("pickle files","*.pckl")])
+        if dir == '' or dir == ():
+            return
         self.current_objects = self.load_obj(dir=dir)
         self.redraw_current_objects()
 
@@ -1341,6 +1346,171 @@ class plot_application:
 
         return
 
+    def distance_menu(self):
+        '''popup menu to choose objects and timerange to plot linear distance for'''
+        choice_list = []
+        choice_1_var = tkinter.StringVar()
+        choice_2_var = tkinter.StringVar()
+        for object in self.current_objects:
+            choice_list.append(object.displayname)
+        if len(choice_list) < 2:
+            self.error_message('error','there must be atleast 2 objects to calculate a distance plot')
+            return
+        choice_1_var.set(choice_list[0])
+        choice_2_var.set(choice_list[1])
+
+        top = tkinter.Toplevel(self.master)
+        top.group(self.master)
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title("distance plot generator")
+        top.rowconfigure(0, weight=1)
+        top.columnconfigure(0, weight=1)
+        dropdown_frame = tkinter.Frame(top)
+        button_frame = tkinter.Frame(top)
+        dropdown_frame.columnconfigure(0, weight=1)
+        dropdown_frame.rowconfigure(0, weight=1)
+
+        dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        object_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
+        object_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        object_frame.columnconfigure(0,weight=1)
+        date_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
+        date_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
+        date_frame.columnconfigure(0,weight=1)
+        button_frame.grid(row=2,column=0)
+
+        choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
+        choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
+        cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
+        cal2 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
+
+        tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
+        tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
+        tkinter.Label(date_frame, text='from').grid(row=0,column=1)
+        tkinter.Label(date_frame, text='to').grid(row=0,column=2)
+        tkinter.Label(date_frame, text='date range:').grid(row=1,column=0,sticky=tkinter.W)
+        choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
+        choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
+        cal1.grid(row=1,column = 1,sticky=tkinter.E+tkinter.W)
+        cal2.grid(row=1,column = 2,sticky=tkinter.E+tkinter.W)
+
+        close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
+        calculate_button = tkinter.Button(button_frame,text='generate plot',command= lambda: self.calculate_distance_plot (choice_1_var.get(), choice_2_var.get(), cal1.get_date(), cal2.get_date() ) )
+        close_button.grid(row=0,column=0)
+        calculate_button.grid(row=0,column=1)
+
+        top.resizable(width=False,height=False)
+        top.transient(self.master)
+
+    def calculate_distance_plot(self,selection1,selection2,date1,date2,resolution = 12,time_format = 'h'):
+        for object in self.current_objects:
+            if object.displayname == selection1:
+                object1 = object
+            if object.displayname == selection2:
+                object2 = object
+        self.prog_bar["value"] = 0
+        self.prog_bar["maximum"] = 2
+        print('requesting data...')
+        vectors1 = self.request_vector_timerange(object1.id,date1,date2,resolution,time_format = time_format)
+        try:
+            if vectors1 == None:
+                return
+        except:
+            pass
+
+        self.prog_bar["value"] = self.prog_bar["value"] + 1
+        self.prog_bar.update()
+
+        vectors2 = self.request_vector_timerange(object2.id,date1,date2,resolution,time_format = time_format)
+        try:
+            if vectors2 == None:
+                return
+        except:
+            pass
+        self.prog_bar["value"] = self.prog_bar["value"] + 1
+        self.prog_bar.update()
+
+        distance = []
+        date_vector = []
+        self.prog_bar["value"] = 0
+        self.prog_bar["maximum"] = len(vectors1)
+        print('calculating ...')
+        for vector1,vector2 in zip(vectors1,vectors2):
+            r1 = [float(entry) for entry in vector1[2:5]]
+            r2 = [float(entry) for entry in vector2[2:5]]
+            r1 = np.array(r1)
+            r2 = np.array(r2)
+            distance.append(np.linalg.norm(r1 - r2))
+            date_vector.append(datetime.datetime.strptime(vector1[1],"A.D.%Y-%b-%d%H:%M:%S.0000"))
+            self.prog_bar["value"] = self.prog_bar["value"] + 1
+            self.prog_bar.update()
+
+        distance = np.array(distance)
+        date_vector_for_matplotlib = mdates.date2num(date_vector)
+
+        min_distance = np.amin(distance)
+        xpos = np.argmin(distance)
+        date_at_min = date_vector_for_matplotlib[xpos]
+        date_at_min2 = date_vector[xpos]
+        print('Done!')
+        distance_frame =  ttk.Frame(self.notebook)
+        distance_frame.rowconfigure(0,weight=1)
+        distance_frame.columnconfigure(0,weight=1)
+
+        fig = plt.figure()
+        fig.subplots_adjust(left=0.16, right=0.98, bottom=0.18, top=0.9)
+        canvas_frame = tkinter.Frame(distance_frame)
+        bottom_frame = tkinter.Frame(distance_frame)
+        canvas_frame.columnconfigure(0,weight=1)
+        bottom_frame.columnconfigure(0,weight=1)
+        canvas_frame.rowconfigure(0,weight=1)
+        bottom_frame.rowconfigure(0,weight=1)
+        canvas_frame.grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        bottom_frame.grid(row=1,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+        toolbarframe = tkinter.Frame(bottom_frame)
+        close_button_frame = tkinter.Frame(bottom_frame)
+        close_button_frame.columnconfigure(0,weight=1)
+        toolbarframe.columnconfigure(0,weight=1)
+        canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
+        canvas.get_tk_widget().grid(row=0,column=0,sticky=tkinter.N+tkinter.W+tkinter.E+tkinter.S)
+
+        toolbarframe.grid(row=0,column=0,sticky=tkinter.W)
+        close_button_frame.grid(row=0,column=1,sticky=tkinter.E)
+        canvas.get_tk_widget().rowconfigure(0,weight=1)
+        canvas.get_tk_widget().columnconfigure(0,weight=1)
+        toolbar = NavigationToolbar2Tk(canvas,toolbarframe)
+        tkinter.Button(close_button_frame,text='close',command= lambda: self.notebook.forget(self.notebook.select())).grid(row=0,column=1,sticky=tkinter.E)
+        ax = fig.gca()
+
+        plot_handle = ax.plot_date(date_vector_for_matplotlib,distance,xdate=True,linestyle='solid', marker='None')
+        annot = ax.text(date_at_min,min_distance, ' {:.4f} AU'.format(min_distance) , verticalalignment='top')
+        annot = ax.text(date_at_min,min_distance, '{:%Y-%m-%d %H:%M:%S} '.format(date_at_min2) , verticalalignment='top',horizontalalignment='right')
+
+        ax.xaxis_date()
+        ax.xaxis.set_major_locator(LinearLocator())
+        ax.yaxis.set_major_locator(LinearLocator())
+
+        date_format = mdates.DateFormatter('%Y-%m-%d')
+        ax.xaxis.set_major_formatter(date_format)
+
+        ax.set_xlabel('date YYYY/MM/DD [UTC]')
+        ax.set_ylabel('distance in AU')
+        ax.grid(b=True,axis='both',linestyle= '--',dashes=(10,15) ,color='k')
+        ax.set_aspect('auto')
+        ax.set_title('distance between\n{0} and {1}'.format(object1.displayname,object2.displayname))
+        fig.autofmt_xdate()
+        canvas.draw()
+        name1= object1.displayname
+        name2= object2.displayname
+        if len(name1) >15:
+            name1 = name1[0:15]+'..'
+        if len(name2) >15:
+            name2 = name2[0:15]+'..'
+        self.notebook.add(distance_frame,text='{0} <-> {1}'.format(name1,name2))
+        self.notebook.select(self.notebook.tabs()[-1])
+
     def porkchop_menu(self):
         ''' popup menu to choose parameters for porkchop plot generation'''
 
@@ -1415,11 +1585,11 @@ class plot_application:
         misc_frame = tkinter.LabelFrame(dropdown_frame,text='advanced settings',pady=5,padx=5)
         misc_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E)
         misc_frame.columnconfigure(0,weight=1)
-
+        button_frame.grid(row=2,column=0)
 
         vcmd_int = (dropdown_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         vcmd_float = (dropdown_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        button_frame.grid(row=2,column=0)
+
         choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
         choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
         cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
@@ -1505,6 +1675,7 @@ class plot_application:
                 delta_t = date_vector2 - date_vector1
                 if delta_t.total_seconds() > 0:
                     _,_,_,dV_array_depart[counter2][counter1],dV_array_arrival[counter2][counter1] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False, numiters=iterations, tolerance = tolerance)
+                    # dV_array_depart[counter2][counter1], dV_array_arrival[counter2][counter1] = self.solve_lambert_pykep(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8],numiters=iterations, tolerance = tolerance)
                 else:
                     dV_array_depart[counter2][counter1] = np.nan
                     dV_array_arrival[counter2][counter1] = np.nan
@@ -1588,13 +1759,31 @@ class plot_application:
 
         return
 
-    def request_vector_timerange(self,id,date1,date2,resolution,errors=0):
+    def solve_lambert_pykep(self, r1, r2,dt,object1,object2,numiters=50,tolerance=1e-6, rev=0):
+        r1 = [float(r1[0]) , float(r1[1]) , float(r1[2])]
+        r2 = [float(r2[0]) , float(r2[1]) , float(r2[2])]
+
+        l = lambert_problem(r1,r2,dt)
+        v_p1 = [float(entry) for entry in object1]
+        v_p2 = [float(entry) for entry in object2]
+        v_p1 = np.array(v_p1) / (24*60*60)
+        v_p2 = np.array(v_p2) / (24*60*60)
+        delta_v1 = np.linalg.norm(l.get_v1()[rev] - v_p1)
+        delta_v2 = np.linalg.norm(l.get_v2()[rev] - v_p2)
+
+        return delta_v1,delta_v2
+
+    def request_vector_timerange(self,id,date1,date2,resolution,errors=0,time_format = 'd'):
         ''' function to request a timerange of ephemerides of one object from the JPL horizons DB as cartesian state vectors'''
         batchfile = self.batchfile_timerange
         batchfile['COMMAND'] = str(id)
         batchfile['START_TIME'] = "'"+str(date1)+"'"
         batchfile['STOP_TIME'] = "'"+str(date2)+"'"
-        batchfile['STEP_SIZE'] = "'"+str(resolution) + " d'"
+        if resolution <1:
+            print('only time formats >1')
+            return
+
+        batchfile['STEP_SIZE'] = "'"+str(resolution) + " " +time_format +"'"
 
         try:
             r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile,timeout=2.0)
@@ -1605,7 +1794,11 @@ class plot_application:
             self.error_message('Connection Error','Could not reach the Server, please check your internet connection.')
             return False,False
         # print(r.text)
-        vectors = r.text.split('$$SOE')[1].split('$$EOE')[0].replace(' ','').splitlines()
+        try:
+            vectors = r.text.split('$$SOE')[1].split('$$EOE')[0].replace(' ','').splitlines()
+        except:
+            self.error_message('Sorry!','Something with the Database textparsing went wrong')
+            return
         del vectors[0]
         vectors = [vector.split(',') for vector in vectors]
         vectors = np.array(vectors)
