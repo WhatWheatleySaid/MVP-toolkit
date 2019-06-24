@@ -8,4 +8,4 @@ preliminary delta-V calcultations.
 Dependencies:
 matplotlib
 numpy
-jdcalendar
+jdcal
