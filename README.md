@@ -11,6 +11,6 @@ numpy
 jdcal
 tkcalendar
 ![GUI](https://github.com/koba1312/MVP-toolkit/blob/master/images/MVP_toolkit_example.PNG)
-![GUI2](https://github.com/koba1312/MVP-toolkit/blob/master/images/Porckhop_example.png)
-![GUI2](https://github.com/koba1312/MVP-toolkit/blob/master/images/MVP_toolkit_example2.PNG)
-![GUI2](https://github.com/koba1312/MVP-toolkit/blob/master/images/Porckhop_menu.png)
+![GUI2](https://github.com/koba1312/MVP-toolkit/blob/master/images/Porckchop_example.png)
+![GUI3](https://github.com/koba1312/MVP-toolkit/blob/master/images/MVP_toolkit_example2.PNG)
+![GUI4](https://github.com/koba1312/MVP-toolkit/blob/master/images/Porckchop_menu.png)
