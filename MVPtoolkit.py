@@ -21,7 +21,7 @@ from tkinter import ttk
 import operator
 import csv
 import configparser,ast
-from pykep import lambert_problem
+# from pykep import lambert_problem
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.ticker import ScalarFormatter
@@ -1759,19 +1759,19 @@ class plot_application:
 
         return
 
-    def solve_lambert_pykep(self, r1, r2,dt,object1,object2,numiters=50,tolerance=1e-6, rev=0):
-        r1 = [float(r1[0]) , float(r1[1]) , float(r1[2])]
-        r2 = [float(r2[0]) , float(r2[1]) , float(r2[2])]
-
-        l = lambert_problem(r1,r2,dt)
-        v_p1 = [float(entry) for entry in object1]
-        v_p2 = [float(entry) for entry in object2]
-        v_p1 = np.array(v_p1) / (24*60*60)
-        v_p2 = np.array(v_p2) / (24*60*60)
-        delta_v1 = np.linalg.norm(l.get_v1()[rev] - v_p1)
-        delta_v2 = np.linalg.norm(l.get_v2()[rev] - v_p2)
-
-        return delta_v1,delta_v2
+    # def solve_lambert_pykep(self, r1, r2,dt,object1,object2,numiters=50,tolerance=1e-6, rev=0):
+    #     r1 = [float(r1[0]) , float(r1[1]) , float(r1[2])]
+    #     r2 = [float(r2[0]) , float(r2[1]) , float(r2[2])]
+    #
+    #     l = lambert_problem(r1,r2,dt)
+    #     v_p1 = [float(entry) for entry in object1]
+    #     v_p2 = [float(entry) for entry in object2]
+    #     v_p1 = np.array(v_p1) / (24*60*60)
+    #     v_p2 = np.array(v_p2) / (24*60*60)
+    #     delta_v1 = np.linalg.norm(l.get_v1()[rev] - v_p1)
+    #     delta_v2 = np.linalg.norm(l.get_v2()[rev] - v_p2)
+    #
+    #     return delta_v1,delta_v2
 
     def request_vector_timerange(self,id,date1,date2,resolution,errors=0,time_format = 'd'):
         ''' function to request a timerange of ephemerides of one object from the JPL horizons DB as cartesian state vectors'''
