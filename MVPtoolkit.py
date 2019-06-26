@@ -21,7 +21,12 @@ from tkinter import ttk
 import operator
 import csv
 import configparser,ast
-# from pykep import lambert_problem
+pykep_installed = True
+try:
+    from pykep import lambert_problem
+    # import somethingwhichdoescertainlynotexist
+except:
+    pykep_installed = False
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.ticker import ScalarFormatter
@@ -29,8 +34,8 @@ from matplotlib.ticker import ScalarFormatter
 from matplotlib.backend_bases import key_press_handler
 from tkcalendar import DateEntry,Calendar
 from tkinter import filedialog
-# import io
-# from PIL import Image
+#fix for freezing needs multiprocessing freeze support:
+import multiprocessing
 
 class celestial_artist:
     def __init__(self,id,orbit,pos,date,name,text,keplers):
@@ -51,12 +56,14 @@ class celestial_artist:
         self.keplers = keplers
 
 class plot_application:
-    def __init__(self, master):
+    def __init__(self, master,pykep_installed):
         self.master = master
+        self.pykep_installed = pykep_installed
         self.AUinKM = 149597870.691 #km/AU
         self.G = 6.673e-20 / np.power(self.AUinKM,3) #km³/kg*s²
         self.GM_sun = 1.3271244018e11 / np.power(self.AUinKM,3)
         self.M_sun = self.GM_sun / self.G
+        self.GM_sun = self.GM_sun.tolist()
         self.index = 0
         self.kepler_dict = {}
         self.planet_positions = []
@@ -1545,10 +1552,17 @@ class plot_application:
         iteration_var.set('50')
         tolerance_var = tkinter.StringVar()
         tolerance_var.set('0.0001')
+        revolution_list = [ '0' , '1' , '2' , '3' , '4' , '5' ]
+        revolution_var = tkinter.StringVar()
+        revolution_var.set('0')
         interpolation_list = ['none', 'nearest', 'bilinear', 'bicubic', 'spline16', 'spline36', 'hanning', 'hamming', 'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian', 'bessel', 'mitchell', 'sinc', 'lanczos']
         interpolation_var = tkinter.StringVar()
         interpolation_var.set('bilinear')
-        pulse_direction_options = [('prograde','prograde') , ('retrograde','retrograde') , ('both', 'both')]
+        if not self.pykep_installed:
+            pulse_direction_options = [('prograde','prograde') , ('retrograde','retrograde') , ('both', 'both')]
+        else:
+            pulse_direction_options = [('prograde','prograde') , ('retrograde','retrograde')]
+
         dV_options = [('launch','launch') , ('arrival' , 'arrival') , ('both','both')]
 
 
@@ -1599,7 +1613,7 @@ class plot_application:
         iteration_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_int ,textvariable=iteration_var)
         tolerance_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_float ,textvariable=tolerance_var)
         interpolation_choice = tkinter.OptionMenu(misc_frame, interpolation_var, *interpolation_list)
-
+        revolution_choice = tkinter.OptionMenu(misc_frame, revolution_var, *revolution_list )
 
         tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
         tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
@@ -1608,17 +1622,25 @@ class plot_application:
         tkinter.Label(date_frame, text='date range:').grid(row=1,column=0,sticky=tkinter.W)
         tkinter.Label(misc_frame, text='resolution in days:').grid(row=0,column=0,sticky=tkinter.W)
         tkinter.Label(misc_frame, text='image interpolation:').grid(row=1,column=0,sticky=tkinter.W)
-        tkinter.Label(misc_frame, text='number of iterations:').grid(row=2,column=0,sticky=tkinter.W)
-        tkinter.Label(misc_frame, text='numerical tolerance:').grid(row=3,column=0,sticky=tkinter.W)
+        if not self.pykep_installed:
+            tkinter.Label(misc_frame, text='number of iterations:').grid(row=2,column=0,sticky=tkinter.W)
+            tkinter.Label(misc_frame, text='numerical tolerance:').grid(row=3,column=0,sticky=tkinter.W)
+        else:
+            # tkinter.Label(misc_frame, text='number of revolutions:').grid(row = 2,column =0, sticky= tkinter.W)
+            pass
+
         choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
         choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
         cal1.grid(row=1,column = 1,sticky=tkinter.E+tkinter.W)
         cal2.grid(row=1,column = 2,sticky=tkinter.E+tkinter.W)
         resolution_entry.grid(row=0,column=2,sticky=tkinter.E)
         interpolation_choice.grid(row=1,column=2,sticky=tkinter.E)
-        iteration_entry.grid(row=2,column=2, sticky = tkinter.E)
-        tolerance_entry.grid(row=3,column=2,sticky=tkinter.E)
-
+        if not self.pykep_installed:
+            iteration_entry.grid(row=2,column=2, sticky = tkinter.E)
+            tolerance_entry.grid(row=3,column=2,sticky=tkinter.E)
+        else:
+            # revolution_choice.grid(row=2,column=2,sticky=tkinter.E)
+            pass
         #############radiobuttons###############
         pulse_frame = tkinter.LabelFrame(misc_frame, text= 'pulse direction')
         # pulse_frame.columnconfigure(0,weight=1)
@@ -1641,13 +1663,13 @@ class plot_application:
         #######################################
 
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get(), int(iteration_var.get()), float(tolerance_var.get()) , top))
+        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get(), int(iteration_var.get()), float(tolerance_var.get()) , top, rev=int(revolution_var.get())))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
         top.resizable(width=False,height=False)
         top.transient(self.master)
 
-    def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation,iterations,tolerance,top):
+    def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation,iterations,tolerance,top,rev=0):
         ''' function to calculate porkchop plot and plot the array as heatmap'''
         top.destroy()
         for object in self.current_objects:
@@ -1674,8 +1696,11 @@ class plot_application:
                 date_vector2 = datetime.datetime.strptime(vector2[1],"A.D.%Y-%b-%d00:00:00.0000")
                 delta_t = date_vector2 - date_vector1
                 if delta_t.total_seconds() > 0:
-                    _,_,_,dV_array_depart[counter2][counter1],dV_array_arrival[counter2][counter1] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False, numiters=iterations, tolerance = tolerance)
-                    # dV_array_depart[counter2][counter1], dV_array_arrival[counter2][counter1] = self.solve_lambert_pykep(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8],numiters=iterations, tolerance = tolerance)
+                     if self.pykep_installed:
+                         dV_array_depart[counter2][counter1], dV_array_arrival[counter2][counter1] = self.solve_lambert_pykep(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8],clockwise=False,rev=rev)
+                     else:
+                         _,_,_,dV_array_depart[counter2][counter1],dV_array_arrival[counter2][counter1] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False, numiters=iterations, tolerance = tolerance)
+
                 else:
                     dV_array_depart[counter2][counter1] = np.nan
                     dV_array_arrival[counter2][counter1] = np.nan
@@ -1690,10 +1715,13 @@ class plot_application:
         # for button in self.porkchop_radiobuttons:
         #     button.configure(state= 'normal')
 
+
         date_list = [datetime.datetime.strptime(vector[1],"A.D.%Y-%b-%d00:00:00.0000") for vector in vectors1 ]
         date_list = mdates.date2num(date_list)
         dV_array_depart = dV_array_depart * self.AUinKM
         dV_array_arrival = dV_array_arrival * self.AUinKM
+        dV_array_depart[ dV_array_depart > 16] = np.nan
+        dV_array_arrival[ dV_array_arrival > 16] = np.nan
         print('done!')
         if self.dV_var.get() == 'launch':
             dV_array = dV_array_depart
@@ -1759,19 +1787,19 @@ class plot_application:
 
         return
 
-    # def solve_lambert_pykep(self, r1, r2,dt,object1,object2,numiters=50,tolerance=1e-6, rev=0):
-    #     r1 = [float(r1[0]) , float(r1[1]) , float(r1[2])]
-    #     r2 = [float(r2[0]) , float(r2[1]) , float(r2[2])]
-    #
-    #     l = lambert_problem(r1,r2,dt)
-    #     v_p1 = [float(entry) for entry in object1]
-    #     v_p2 = [float(entry) for entry in object2]
-    #     v_p1 = np.array(v_p1) / (24*60*60)
-    #     v_p2 = np.array(v_p2) / (24*60*60)
-    #     delta_v1 = np.linalg.norm(l.get_v1()[rev] - v_p1)
-    #     delta_v2 = np.linalg.norm(l.get_v2()[rev] - v_p2)
-    #
-    #     return delta_v1,delta_v2
+    def solve_lambert_pykep(self, r1, r2,dt,object1,object2,clockwise=False,rev=0):
+
+        r1 = [float(r1[0]) , float(r1[1]) , float(r1[2])]
+        r2 = [float(r2[0]) , float(r2[1]) , float(r2[2])]
+        l = lambert_problem(r1,r2,dt,self.GM_sun,clockwise,rev)
+        v_p1 = [float(entry) for entry in object1]
+        v_p2 = [float(entry) for entry in object2]
+        v_p1 = np.array(v_p1) / (24*60*60)
+        v_p2 = np.array(v_p2) / (24*60*60)
+        delta_v1 = np.linalg.norm(l.get_v1()[rev] - v_p1)
+        delta_v2 = np.linalg.norm(l.get_v2()[rev] - v_p2)
+
+        return delta_v1,delta_v2
 
     def request_vector_timerange(self,id,date1,date2,resolution,errors=0,time_format = 'd'):
         ''' function to request a timerange of ephemerides of one object from the JPL horizons DB as cartesian state vectors'''
@@ -1811,16 +1839,13 @@ class plot_application:
         a = object.keplers['a']
         ecc_anomaly = np.arccos( (ecc + np.cos(true_anomaly)) / (1 + ecc*np.cos(true_anomaly)) )
         r = a*(1-ecc*np.cos(ecc_anomaly))
-        # print('{0}:'.format(object.displayname))
-        # print(r)
-        # print(ecc_anomaly)
-        # print(a)
-        # pprint(object.keplers)
         v = (np.sqrt(self.GM_sun*a) / r) * np.array([ -np.sin(ecc_anomaly) , np.sqrt(1-(ecc)**2)*np.cos(ecc_anomaly) , 0 ])
         return v
 
 
 if __name__ == '__main__':
+    #pyinstaller fix
+    multiprocessing.freeze_support()
     root = tkinter.Tk()
     '''Icons made by "https://www.freepik.com/" from "https://www.flaticon.com/"
     www.flaticon.com is licensed by "http://creativecommons.org/licenses/by/3.0/"'''
@@ -1828,5 +1853,5 @@ if __name__ == '__main__':
     root.tk.call('wm','iconphoto',root._w,icon_img)
     tkinter.Grid.rowconfigure(root, 0, weight=1)
     tkinter.Grid.columnconfigure(root, 0, weight=1)
-    gui = plot_application(root)
+    gui = plot_application(root,pykep_installed)
     root.mainloop()
