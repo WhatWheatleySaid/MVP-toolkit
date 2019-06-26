@@ -10,6 +10,7 @@ matplotlib
 numpy
 jdcal
 tkcalendar
+requests
 
 optional:
 pykep (recommended!)
