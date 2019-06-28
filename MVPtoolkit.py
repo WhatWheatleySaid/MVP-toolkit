@@ -15,9 +15,20 @@ import matplotlib.dates as mdates
 from matplotlib.ticker import LinearLocator
 from pathlib import Path
 import pickle
-import tkinter
-from tkinter.colorchooser import *
-from tkinter import ttk
+try:
+    import tkinter
+    from tkinter.colorchooser import *
+    from tkinter import ttk
+    from tkcalendar import DateEntry,Calendar
+    from tkinter import filedialog
+except:
+    import Tkinter
+    from Tkinter.colorchooser import *
+    from Tkinter import ttk
+    from tkcalendar import DateEntry,Calendar
+    from Tkinter import filedialog
+
+
 import operator
 import csv
 import configparser,ast
@@ -32,8 +43,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.ticker import ScalarFormatter
 # Implement the appearance Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
-from tkcalendar import DateEntry,Calendar
-from tkinter import filedialog
+
 #fix for freezing needs multiprocessing freeze support:
 import multiprocessing
 
@@ -90,6 +100,10 @@ class plot_application:
         self.dV_var = tkinter.StringVar()
         self.dV_var.set('launch')
 
+        #license
+        with open('LICENSE','r') as f:
+            self.license_text = f.read()
+        self.version = 'v0.5.1w'
 
         self.default_colors = ['#191919','#7f7f7f','#ffffff','#000000']
         self.resolution = 1600
@@ -163,6 +177,7 @@ class plot_application:
         # self.equinox_cid = self.ax.callbacks.connect('xlim_changed',self.scale_equinox)
 
         self.menubar = tkinter.Menu(self.master)
+
         self.filemenu = tkinter.Menu(self.menubar,tearoff = 0)
 
         self.filemenu.add_command(label="export figure as", command=self.save_file_as)
@@ -178,8 +193,13 @@ class plot_application:
         self.tools_menu.add_command(label='add custom object', command=self.custom_object_menu)
         self.tools_menu.add_command(label='plot linear distance over time', command=self.distance_menu)
 
-        self.menubar.add_cascade(label='File',menu=self.filemenu)
-        self.menubar.add_cascade(label='Tools',menu=self.tools_menu)
+        self.about_menu = tkinter.Menu(self.menubar,tearoff = 0)
+        self.about_menu.add_command(label= 'about', command = self.about_popup)
+
+
+        self.menubar.add_cascade(label='file',menu=self.filemenu)
+        self.menubar.add_cascade(label='tools',menu=self.tools_menu)
+        self.menubar.add_cascade(label='about', menu = self.about_menu)
         self.master.config(menu=self.menubar)
 
         self.button1 = tkinter.Button(master=self.master, text="new Plot", command=lambda : self.refresh_plot(True))
@@ -234,6 +254,32 @@ class plot_application:
 
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    def about_popup(self):
+        top = tkinter.Toplevel()
+
+        x = root.winfo_x()
+        y = root.winfo_y()
+        top.geometry("+%d+%d" % (x + 10, y + 20))
+        top.title('about')
+
+
+        tabcontrol = ttk.Notebook(top)
+        copyright_tab = ttk.Frame(tabcontrol)
+        license_tab = ttk.Frame(tabcontrol)
+        tabcontrol.add(copyright_tab, text = 'copyright')
+        tabcontrol.add(license_tab, text = 'GPL-3.0 license')
+        tabcontrol.grid(row=0,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
+        copyright_text = tkinter.Text(copyright_tab)
+        copyright_text.tag_configure("center",justify='center')
+        copyright_text.insert(tkinter.END,'MVP-toolkit {0}\n(C) 2019 by Alexander M. Bauer under GPL-3.0 license\n\nAlgorythms for lambert problem solving:\n PyKEP (c) by ESA(pykep dev-Team) under GPL-3.0\n\nplotting and graphing:\n Matplotlib, see matplotlib.org\n'.format(self.version))
+        copyright_text.insert(tkinter.END, '\n\nIcons made by "https://www.freepik.com/" from "https://www.flaticon.com/" \nwww.flaticon.com is licensed by "http://creativecommons.org/licenses/by/3.0/"')
+        copyright_text.tag_add('center', "1.0", "end")
+        copyright_text.config(state=tkinter.DISABLED)
+        copyright_text.grid(row=0,column=0)
+
+        license_text = tkinter.Text(license_tab)
+        license_text.insert(tkinter.END, self.license_text)
+        license_text.pack()
     class Annotation3D(Annotation):
         '''Annotate the point xyz with text s'''
 
@@ -1026,6 +1072,9 @@ class plot_application:
             small_bodies = {}
         self.JPL_numbers.update(small_bodies)
         self.JPL_numbers = dict((k,v) for k,v in self.JPL_numbers.items() if not (v==''))
+        #when all objects should be loaded and named after their numbering (laggy!!!)
+
+        self.JPL_numbers = dict ( (k,v) if not (v=='') else (k,k) for k,v in self.JPL_numbers.items())
         self.JPL_numbers = self.sort_vals(self.JPL_numbers)
         self.JPL_name2num = dict((v,k) for k,v in self.JPL_numbers.items())
 
