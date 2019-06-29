@@ -1308,7 +1308,7 @@ class plot_application:
         choice_1.grid(row=0,column=1,sticky=tkinter.E)
         choice_2.grid(row=1,column=1,sticky=tkinter.E)
 
-        info_text_widget = tkinter.Label(info_frame,text = 'Attention: Always check for pausibillity of the solution!\n This tool can calculate a rendezvous between two\n points in space with an elliptical transfer. It uses a simple \nnumerical solver, especially at the lower\n and upper boundaries of possible solutions \nthe solver tends to shrink drastically in precision.')
+        info_text_widget = tkinter.Label(info_frame,text = 'Attention: Always check for plausibility of the solution!\n This tool can calculate a rendezvous between two\n points in space with an elliptical transfer. You have to plot the two desired objects on their corresponding dates first to plan a rendezvous between them.')
         info_text_widget.grid(row=0,column=0)
 
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
