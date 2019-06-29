@@ -34,7 +34,7 @@ import csv
 import configparser,ast
 pykep_installed = True
 try:
-    from pykep import lambert_problem
+    from pykep import lambert_problem, ic2par
     # import somethingwhichdoescertainlynotexist
 except:
     pykep_installed = False
@@ -71,7 +71,7 @@ class plot_application:
         self.pykep_installed = pykep_installed
         self.AUinKM = 149597870.691 #km/AU
         self.G = 6.673e-20 / np.power(self.AUinKM,3) #km³/kg*s²
-        self.GM_sun = 1.3271244018e11 / np.power(self.AUinKM,3)
+        self.GM_sun = 1.3271244018e11 / np.power(self.AUinKM,3) #AU³ /s²
         self.M_sun = self.GM_sun / self.G
         self.GM_sun = self.GM_sun.tolist()
         self.index = 0
@@ -124,7 +124,7 @@ class plot_application:
         self.dt = datetime.datetime.now()
         self.dates = []
         self.julian_date =  "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
-        self.order_of_keplers = ['excentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance','sidereal_period']
+        self.order_of_keplers = ['eccentricity','periapsis_distance','inclination','Omega','omega','Tp','n','mean_anomaly','true_anomaly','a','apoapsis_distance','sidereal_period']
         self.objects = ["'399'","'499'","'-143205'"] #earth,mars,Tesla roadster, ... ceres : ,"'5993'"
         self.batchfile = {"COMMAND": "'399'","CENTER": "'500@10'","MAKE_EPHEM": "'YES'","TABLE_TYPE": "'ELEMENTS'","TLIST":self.julian_date,"OUT_UNITS": "'AU-D'","REF_PLANE": "'ECLIPTIC'","REF_SYSTEM": "'J2000'","TP_TYPE": "'ABSOLUTE'","ELEM_LABELS": "'YES'","CSV_FORMAT": "'YES'","OBJ_DATA": "'YES'"}
         self.batchfile_timerange = {"COMMAND": "'399'","CENTER": "'500@10'","MAKE_EPHEM": "'YES'","TABLE_TYPE": "'VECTORS'","START_TIME": '',"STOP_TIME": '',"STEP_SIZE": '1 d',"OUT_UNITS": "'AU-D'","REF_PLANE": "'ECLIPTIC'","REF_SYSTEM": "'J2000'","VECT_CORR":"'NONE'","VEC_LABELS": "'NO'","VEC_DELTA_T": "'NO'","CSV_FORMAT": "'YES'","OBJ_DATA": "'NO'","VEC_TABLE": "'2'"}
@@ -541,7 +541,7 @@ class plot_application:
             r = np.matmul(self.rot_x(i),r)
             r = np.matmul(self.rot_z(Omega),r)
         elif e <=1:
-            # e = 1 atually wrong, here just to prevent crash, exact excentricity of 1 should not happen
+            # e = 1 atually wrong, here just to prevent crash, exact eccentricity of 1 should not happen
             p = a * (1-(e**2))
             r = p/(1+e*np.cos(self.nu))
             r = np.array([np.multiply(r,np.cos(self.nu)) , np.multiply(r,np.sin(self.nu)), np.zeros(len(self.nu))])
@@ -837,8 +837,8 @@ class plot_application:
                 kepler_dict['true_anomaly'] = np.deg2rad(kepler_dict['true_anomaly'])
                 # print('\n\n{0}:\n'.format(self.JPL_numbers[object]))
                 # pprint(kepler_dict)
-                orbit = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'] , comp_true_anomaly=kepler_dict['true_anomaly'] )
-                position = self.orbit_position(kepler_dict['a'],kepler_dict['excentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'],[kepler_dict['true_anomaly']])
+                orbit = self.orbit_position(kepler_dict['a'],kepler_dict['eccentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'] , comp_true_anomaly=kepler_dict['true_anomaly'] )
+                position = self.orbit_position(kepler_dict['a'],kepler_dict['eccentricity'],kepler_dict['Omega'],kepler_dict['inclination'],kepler_dict['omega'],[kepler_dict['true_anomaly']])
                 orbits.append(orbit)
                 positions.append(position)
             added = False
@@ -1167,7 +1167,7 @@ class plot_application:
             elif self.pulse_direction_var.get() == 'retrograde':
                 if inclination <= np.pi/2:
                     return False,False,False,False,False
-        keplers = {'excentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':true_anomaly,'a':a}
+        keplers = {'eccentricity':ecc,'inclination':inclination,'Omega':Omega,'omega':omega,'true_anomaly':true_anomaly,'a':a}
         return v_1, v_2, keplers, delta_v1, delta_v2
 
     def calc_rendezvous(self,selection1,selection2):
@@ -1192,8 +1192,8 @@ class plot_application:
             return
         # print('v1: {0}\nv2:{1}\nkeplers:{2}\n'.format(v1,v2,keplers))
         #def orbit_position(self,a,e,Omega,i,omega,true_anomaly=False):
-        orbit = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],comp_true_anomaly=kepler_dict['true_anomaly'])
-        pos = self.orbit_position(keplers['a'],keplers['excentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],[keplers['true_anomaly'] + np.pi/2])
+        orbit = self.orbit_position(keplers['a'],keplers['eccentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],comp_true_anomaly=kepler_dict['true_anomaly'])
+        pos = self.orbit_position(keplers['a'],keplers['eccentricity'],keplers['Omega'],keplers['inclination'],keplers['omega'],[keplers['true_anomaly'] + np.pi/2])
 
 
         #class celestial_artist:
@@ -1207,7 +1207,41 @@ class plot_application:
 
         return
 
-    def kart2kep(self,r,v):
+    def calc_rendezvous_pykep(self,selection1,selection2):
+        ''' function to calculate a rendeszvous orbit via PyKEP'''
+        for object in self.current_objects:
+            if object.displayname == selection1:
+                object1 = object
+            if object.displayname == selection2:
+                object2 = object
+        dt = object2.date -object1.date
+        if float(dt.total_seconds()) <=0:
+            self.error_message('error','you can only plan a rendezvous forward in time!')
+            return
+        dt = dt.total_seconds()
+        pos1 = object1.pos
+        pos2 = object2.pos
+        v_p1 = self.kep2velocity(object1)
+        v_p2 = self.kep2velocity(object2)
+
+        delta_v1,delta_v2, l = self.solve_lambert_pykep(pos1,pos2,dt,v_p1,v_p2)
+
+        v1 = l.get_v1()[0]
+        print(pos1,v1)
+
+        ecc, inclination, Omega, omega, true_anomaly, a = self.kart2kep(pos1.flatten(),v1,a=True)
+        #,a,e,Omega,i,omega,true_anomaly=False,comp_true_anomaly=False)
+        orbit = self.orbit_position(a,ecc,Omega,inclination,omega, comp_true_anomaly = true_anomaly)
+        pos =  self.orbit_position(a,ecc,Omega,inclination,omega , true_anomaly = [true_anomaly + np.pi/2])
+        lambert_object = celestial_artist(None,orbit,pos,str(object1.date) + ' to ' + str(object2.date),'Lambert solution',
+        '*********\nthis is the 0 rev. solution to the Lambertproblem of the transfer from:\n{0} -> {1}\n\n*********\n'
+        'Delta V for Transferorbit as single pulse:\t{2:.4f} km/s \nDelta V for Injection into target orbit:\t{3:.4f} km/s\nOverall Delta V:\t{4:.4f} km/s'.format(object1.displayname,object2.displayname,delta_v1*self.AUinKM,delta_v2*self.AUinKM,np.abs(delta_v1+delta_v2)*self.AUinKM) , None)
+        self.current_objects.append(lambert_object)
+        self.redraw_current_objects()
+
+        return
+
+    def kart2kep(self,r,v, a=False):
         ''' function to transform cartesian statevectors to kepler elements'''
         h = np.cross(r,v)
         h_norm = h / np.linalg.norm(h)
@@ -1227,9 +1261,13 @@ class plot_application:
         if ecc_vector[2] >= 0:
             omega = np.arccos(np.dot(n,ecc_vector)/(np.linalg.norm(n)*np.linalg.norm(ecc_vector)))
         else:
-            omega = np.arccos(np.dot(n,ecc_vector)/(np.linalg.norm(n)*np.linalg.norm(ecc_vector)))
+            omega = 2*np.pi - np.arccos(np.dot(n,ecc_vector)/(np.linalg.norm(n)*np.linalg.norm(ecc_vector)))
 
-        return ecc, inclination, Omega, omega, true_anomaly
+        if a:
+            a = 1 / ( (2/np.linalg.norm(r)) - (np.power(np.linalg.norm(v), 2) / self.GM_sun) )
+            return ecc, inclination, Omega, omega, true_anomaly, a
+        else:
+            return ecc, inclination, Omega, omega, true_anomaly
 
     def lambert_menu(self):
         ''' menu to choose parameters for the lambert solver to plot a rendeszvous orbit'''
@@ -1274,7 +1312,7 @@ class plot_application:
         info_text_widget.grid(row=0,column=0)
 
         close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='calculate!',command=lambda : self.calc_rendezvous(choice_1_var.get(),choice_2_var.get()))
+        calculate_button = tkinter.Button(button_frame,text='calculate!',command=lambda : self.calc_rendezvous_pykep(choice_1_var.get(),choice_2_var.get()))
         close_button.grid(row=0,column=0)
         calculate_button.grid(row=0,column=1)
         top.transient(self.master)
@@ -1290,6 +1328,7 @@ class plot_application:
             MULTIPLE REVOLUTION LAMBERT´S TARGETING PROBLEM: AN ANALYTICAL
             APPROXIMATION
             by Claudio Bombardelli, Juan Luis Gonzalo, and Javier Roa
+            ****WIP****
         '''
         r1_norm = np.linalg.norm(r1)
         r2_norm = np.linalg.norm(r2)
@@ -1728,7 +1767,7 @@ class plot_application:
                 object2 = object
         vectors1 = self.request_vector_timerange(object1.id,date1,date2,resolution)
         vectors2 = self.request_vector_timerange(object2.id,date1,date2,resolution)
-        dV_array_depart = np.zeros((len(vectors1)+1,len(vectors2)+1))
+        dV_array_depart = np.zeros((len(vectors1),len(vectors2)))
         dV_array_arrival = dV_array_depart
         counter1 = 0
         counter2 = 0
@@ -1746,7 +1785,7 @@ class plot_application:
                 delta_t = date_vector2 - date_vector1
                 if delta_t.total_seconds() > 0:
                      if self.pykep_installed:
-                         dV_array_depart[counter2][counter1], dV_array_arrival[counter2][counter1] = self.solve_lambert_pykep(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8],clockwise=False,rev=rev)
+                         dV_array_depart[counter2][counter1], dV_array_arrival[counter2][counter1] , _ = self.solve_lambert_pykep(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8],clockwise=False,rev=rev)
                      else:
                          _,_,_,dV_array_depart[counter2][counter1],dV_array_arrival[counter2][counter1] = self.solve_lambert(vector1[2:5] , vector2[2:5] , delta_t.total_seconds() , vector1[5:8] , vector2[5:8] , popup = False, numiters=iterations, tolerance = tolerance)
 
@@ -1765,8 +1804,8 @@ class plot_application:
         #     button.configure(state= 'normal')
 
 
-        date_list = [datetime.datetime.strptime(vector[1],"A.D.%Y-%b-%d00:00:00.0000") for vector in vectors1 ]
-        date_list = mdates.date2num(date_list)
+        date_list_1 = [datetime.datetime.strptime(vector[1],"A.D.%Y-%b-%d00:00:00.0000") for vector in vectors1 ]
+        date_list = mdates.date2num(date_list_1)
         dV_array_depart = dV_array_depart * self.AUinKM
         dV_array_arrival = dV_array_arrival * self.AUinKM
         dV_array_depart[ dV_array_depart > 16] = np.nan
@@ -1778,6 +1817,12 @@ class plot_application:
             dV_array = dV_array_arrival
         else:
             dV_array = dV_array_depart + dV_array_arrival
+
+        ind = np.unravel_index(np.nanargmin(dV_array[:]), dV_array.shape)
+        min_launch_date = date_list[ind[1]]
+        min_arrival_date = date_list[ind[0]]
+        min_dV = np.nanmin(dV_array[:])
+
         porkchop_frame =  ttk.Frame(self.notebook)
         porkchop_frame.rowconfigure(0,weight=1)
         porkchop_frame.columnconfigure(0,weight=1)
@@ -1820,8 +1865,12 @@ class plot_application:
         ax.set_ylabel('arrival date YYYY/MM/DD')
         ax.grid(b=True,axis='both',linestyle= '--',dashes=(10,15) ,color='k')
         ax.set_aspect('auto')
-        ax.set_title('0 rev. transfers between\n{0} and {1}'.format(object1.displayname,object2.displayname))
+        ax.set_title('0 rev. transfers from\n{0} to {1}'.format(object1.displayname,object2.displayname))
         fig.autofmt_xdate()
+
+        #annotate minimum dV
+        annot = ax.text(min_launch_date,min_arrival_date, '  launch: {:%Y-%m-%d}\n  arrival: {:%Y-%m-%d}\n  delta-V: {:.2f} km/s'.format(date_list_1[ind[1]],date_list_1[ind[0]] , min_dV),verticalalignment='center',weight='bold',zorder=100)
+        mark = ax.plot_date(min_launch_date,min_arrival_date,'X', MarkerEdgeColor='k',markersize=7,MarkerFaceColor='w',xdate=True,ydate=True)
         cbar = fig.colorbar(im, ax=ax)
         cbar.set_label(r'departure $\Delta$V in $\frac{km}{s}$')
         canvas.draw()
@@ -1847,8 +1896,7 @@ class plot_application:
         v_p2 = np.array(v_p2) / (24*60*60)
         delta_v1 = np.linalg.norm(l.get_v1()[rev] - v_p1)
         delta_v2 = np.linalg.norm(l.get_v2()[rev] - v_p2)
-
-        return delta_v1,delta_v2
+        return delta_v1,delta_v2, l
 
     def request_vector_timerange(self,id,date1,date2,resolution,errors=0,time_format = 'd'):
         ''' function to request a timerange of ephemerides of one object from the JPL horizons DB as cartesian state vectors'''
@@ -1881,14 +1929,29 @@ class plot_application:
         vectors = np.array(vectors)
         return vectors
 
+
     def kep2velocity(self,object):
         ''' function to calculate the velocity-vector of an object from its kepler elements'''
-        ecc = object.keplers['excentricity']
+        ecc = object.keplers['eccentricity']
         true_anomaly = object.keplers['true_anomaly']
         a = object.keplers['a']
-        ecc_anomaly = np.arccos( (ecc + np.cos(true_anomaly)) / (1 + ecc*np.cos(true_anomaly)) )
-        r = a*(1-ecc*np.cos(ecc_anomaly))
+        # ecc_anomaly = np.arccos( (ecc + np.cos(true_anomaly)) / (1 + ecc*np.cos(true_anomaly)) )
+        # ecc_anomaly = np.arcsin( (np.sqrt(1-ecc**2) *np.sin(true_anomaly)) / (1 + ecc*np.cos(true_anomaly)) )
+        # r = a*(1-ecc*np.cos(ecc_anomaly))
+        r = np.linalg.norm(object.pos)
+        ecc_anomaly = np.arccos((1 -(r/a))/ecc )
         v = (np.sqrt(self.GM_sun*a) / r) * np.array([ -np.sin(ecc_anomaly) , np.sqrt(1-(ecc)**2)*np.cos(ecc_anomaly) , 0 ])
+        v = np.matmul(self.rot_z(-object.keplers['omega']) , v)
+        v = np.matmul(self.rot_x(-object.keplers['inclination']) , v)
+        v = np.matmul(self.rot_z(-object.keplers['Omega']) , v)
+        v = v.flatten()
+        v = v*24*60*60 #convert to AU/d to keep consitency
+        pprint(ecc)
+        pprint(true_anomaly)
+        pprint(a)
+        pprint(r)
+        pprint(ecc_anomaly)
+        pprint(v)
         return v
 
 
