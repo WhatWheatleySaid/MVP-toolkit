@@ -1,3 +1,4 @@
+print('starting ...')
 import requests
 import jdcal
 import datetime
