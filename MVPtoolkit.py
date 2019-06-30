@@ -69,6 +69,7 @@ class celestial_artist:
 class plot_application:
     def __init__(self, master,pykep_installed):
         self.master = master
+        self.master.withdraw()
         self.pykep_installed = pykep_installed
         self.AUinKM = 149597870.691 #km/AU
         self.G = 6.673e-20 / np.power(self.AUinKM,3) #km³/kg*s²
@@ -116,6 +117,7 @@ class plot_application:
         self.refplane_linewidth = 0.3
         self.text_xoffset = 0
         self.text_yoffset = 4
+        self.destroy_was_called = False
         self.check_config()
 
         self.valid_format_list = ['png','jpeg', 'jpg', 'svg', 'pdf', 'pgf',  'ps', 'raw', 'rgba', 'eps', 'svgz', 'tif', 'tiff']
@@ -241,6 +243,7 @@ class plot_application:
         for k,v in self.JPL_numbers.items():
             self.listbox.insert(tkinter.END,v)
         self.canvas.draw()
+        self.master.deiconify()
 
         self.nu = np.linspace(0,2*np.pi,self.resolution)
         orbits,positions = self.request_keplers(self.objects,self.batchfile)
@@ -606,7 +609,7 @@ class plot_application:
                 return pickle.load(f)
 
     def _quit(self):
-        self.master.quit()     # stops mainloop
+        self.master.destroy()     # stops mainloop
         # root.destroy()  # this is necessary on Windows to prevent
                         # Fatal Python Error: PyEval_RestoreThread: NULL tstate
 
@@ -757,7 +760,9 @@ class plot_application:
 
     def on_closing(self):
         if self.ask_ok_popup("Quit", "Do you want to quit?"):
+            self.destroy_was_called = True
             self.master.quit()
+            self.master.destroy()
 
     def error_message(self,title,message):
         '''generates an error message-popup with generic title and message'''
@@ -803,6 +808,8 @@ class plot_application:
 
             # print(r.text)
             count = count + 1
+            if self.destroy_was_called:
+                return
             self.prog_bar["value"] = count
             self.prog_bar.update()
             if 'No ephemeris for target' in r.text:
@@ -1516,7 +1523,8 @@ class plot_application:
                 return
         except:
             pass
-
+        if self.destroy_was_called:
+            return
         self.prog_bar["value"] = self.prog_bar["value"] + 1
         self.prog_bar.update()
 
@@ -1526,11 +1534,16 @@ class plot_application:
                 return
         except:
             pass
+
+        if self.destroy_was_called:
+            return
         self.prog_bar["value"] = self.prog_bar["value"] + 1
         self.prog_bar.update()
 
         distance = []
         date_vector = []
+        if self.destroy_was_called:
+            return
         self.prog_bar["value"] = 0
         self.prog_bar["maximum"] = len(vectors1)
         print('calculating ...')
@@ -1541,6 +1554,8 @@ class plot_application:
             r2 = np.array(r2)
             distance.append(np.linalg.norm(r1 - r2))
             date_vector.append(datetime.datetime.strptime(vector1[1],"A.D.%Y-%b-%d%H:%M:%S.0000"))
+            if self.destroy_was_called:
+                return
             self.prog_bar["value"] = self.prog_bar["value"] + 1
             self.prog_bar.update()
 
@@ -1798,6 +1813,8 @@ class plot_application:
                     dV_array_depart[counter2][counter1] = np.nan
                     dV_array_arrival[counter2][counter1] = np.nan
                 counter2 = counter2 +1
+                if self.destroy_was_called:
+                    return
             self.prog_bar["value"] = counter1
             self.prog_bar.update()
             counter1 = counter1 + 1
