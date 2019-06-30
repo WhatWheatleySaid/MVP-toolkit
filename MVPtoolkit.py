@@ -1,4 +1,4 @@
-print('starting ...')
+﻿print('starting ...')
 import requests
 import jdcal
 import datetime
@@ -104,7 +104,7 @@ class plot_application:
         #license
         with open('LICENSE','r') as f:
             self.license_text = f.read()
-        self.version = 'v0.5.1w'
+        self.version = 'v0.5.2w'
 
         self.default_colors = ['#191919','#7f7f7f','#ffffff','#000000']
         self.resolution = 1600
