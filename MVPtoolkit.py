@@ -286,7 +286,6 @@ class plot_application:
         copyright_text.tag_configure("center",justify='center')
         copyright_text.insert(tkinter.END,'MVP-toolkit {0}\n(C) 2019 by Alexander M. Bauer under GPL-3.0 license\n\n'.format(self.version))
         copyright_text.insert(tkinter.END,'Algorythms for lambert problem solving:\n PyKEP (c) by ESA(pykep dev-Team) under GPL-3.0\n\nplotting and graphing:\n Matplotlib, see matplotlib.org\n\ndata by NASA JPL-HORIZONS, see https://ssd.jpl.nasa.gov/horizons.cgi#top\n\n')
-        copyright_text.insert(tkinter.END, 'Icons made by "https://www.freepik.com/" from "https://www.flaticon.com/" \nwww.flaticon.com is licensed by "http://creativecommons.org/licenses/by/3.0/"')
         copyright_text.tag_add('center', "1.0", "end")
         copyright_text.config(state=tkinter.DISABLED)
         copyright_text.grid(row=0,column=0)
@@ -2006,8 +2005,6 @@ if __name__ == '__main__':
     #pyinstaller fix
     multiprocessing.freeze_support()
     root = tkinter.Tk()
-    '''Icons made by "https://www.freepik.com/" from "https://www.flaticon.com/"
-    www.flaticon.com is licensed by "http://creativecommons.org/licenses/by/3.0/"'''
     icon_img = tkinter.Image("photo",file='./galaxy.png')
     root.tk.call('wm','iconphoto',root._w,icon_img)
     tkinter.Grid.rowconfigure(root, 0, weight=1)
