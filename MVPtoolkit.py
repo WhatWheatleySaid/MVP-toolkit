@@ -118,6 +118,7 @@ class plot_application:
         self.text_xoffset = 0
         self.text_yoffset = 4
         self.destroy_was_called = False
+        self.cancel_was_pushed = False
         self.check_config()
 
         self.valid_format_list = ['png','jpeg', 'jpg', 'svg', 'pdf', 'pgf',  'ps', 'raw', 'rgba', 'eps', 'svgz', 'tif', 'tiff']
@@ -238,8 +239,13 @@ class plot_application:
         self.annot_checkbutton = tkinter.Checkbutton(master=self.master,text='show date at objectposition',variable = self.annot_var,command=self.redraw_current_objects).grid(row=6,column=12,sticky=tkinter.N+tkinter.W)
         self.axis_checkbutton = tkinter.Checkbutton(master=self.master,text='show coordinate axis',variable = self.axis_var,command=self.toggle_axis).grid(row=7,column=11,sticky=tkinter.N+tkinter.W)
         self.proj_checkbutton = tkinter.Checkbutton(master=self.master,text='perspective projection',variable = self.proj_var,command=self.toggle_proj).grid(row=7,column=12,sticky=tkinter.N+tkinter.W)
-        self.prog_bar = tkinter.ttk.Progressbar(self.master,orient='horizontal',length=200,mode='determinate')
-        self.prog_bar.grid(row=8,column=11,columnspan=2,sticky=tkinter.S+tkinter.W+tkinter.E)
+        self.prog_bar_frame = tkinter.Frame(self.master,)
+        self.prog_bar = tkinter.ttk.Progressbar(self.prog_bar_frame,orient='horizontal',length=200,mode='determinate')
+        self.prog_bar.pack(side=tkinter.LEFT,expand=True,fill=tkinter.X)
+        self.prog_bar_cancel_button = tkinter.Button(self.prog_bar_frame,text='cancel',command=self.cancel_current_task,state=tkinter.DISABLED)
+        self.prog_bar_cancel_button.pack(side=tkinter.RIGHT,anchor = tkinter.E)
+        self.prog_bar_frame.grid(row=8,column=11,columnspan=2,sticky=tkinter.S+tkinter.W+tkinter.E)
+
         for k,v in self.JPL_numbers.items():
             self.listbox.insert(tkinter.END,v)
         self.canvas.draw()
@@ -257,6 +263,9 @@ class plot_application:
             # self.current_objects['artists'] = artists
 
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def cancel_current_task(self):
+        self.cancel_was_pushed = True
 
     def about_popup(self):
         top = tkinter.Toplevel()
@@ -486,7 +495,7 @@ class plot_application:
         return np.array([[np.cos(rho),-np.sin(rho),0],[np.sin(rho),np.cos(rho),0],[0,0,1]])
 
     def change_view(self,view):
-        '''sets the view angles of the plot and toggles visibility of the perpendicular axis to false until plot is moved/refreshed   '''
+        '''sets the view angles of the plot and toggles visibility of the perpendicular axis to False until plot is moved/refreshed   '''
         if view == "top":
             self.axis_visibility(event = None,axis='z',visible=False) #produces clicking on artist beeing unresponsive
             self.ax.view_init(90,-90)
@@ -636,6 +645,7 @@ class plot_application:
         objects = [self.JPL_name2num[object] for object in objects]
         self.objects.extend(objects)
         orbits,positions = self.request_keplers(objects,self.batchfile)
+        self.prog_bar_cancel_button['state'] = tkinter.DISABLED
         if orbits == False:
             pass
         else:
@@ -770,6 +780,7 @@ class plot_application:
 
     def request_keplers(self,objects,batchfile,errors=0):
         '''requests kepler elements from HORIZONS-batch-interface for objects'''
+        self.prog_bar_cancel_button['state'] = tkinter.NORMAL
         print('requesting keplers for selected items')
         orbits = []
         positions = []
@@ -810,6 +821,12 @@ class plot_application:
             count = count + 1
             if self.destroy_was_called:
                 return
+            if self.cancel_was_pushed:
+                self.cancel_was_pushed = False
+                self.prog_bar["value"] = 0
+                self.prog_bar_cancel_button['state'] = tkinter.DISABLED
+                self.redraw_current_objects()
+                return False,False
             self.prog_bar["value"] = count
             self.prog_bar.update()
             if 'No ephemeris for target' in r.text:
@@ -866,7 +883,6 @@ class plot_application:
                         return self.request_keplers(objects,self.batchfile)
                     else:
                         continue
-
             self.current_objects.append(celestial_artist(object,orbit,position,self.dt,self.JPL_numbers[object],r.text,kepler_dict))
             self.current_objects[-1].moon = moon
             self.current_objects[-1].center_body = parent_position
@@ -1509,6 +1525,7 @@ class plot_application:
         top.transient(self.master)
 
     def calculate_distance_plot(self,selection1,selection2,date1,date2,resolution = 12,time_format = 'h'):
+        self.prog_bar_cancel_button['state'] = tkinter.NORMAL
         for object in self.current_objects:
             if object.displayname == selection1:
                 object1 = object
@@ -1556,9 +1573,14 @@ class plot_application:
             date_vector.append(datetime.datetime.strptime(vector1[1],"A.D.%Y-%b-%d%H:%M:%S.0000"))
             if self.destroy_was_called:
                 return
+            if self.cancel_was_pushed:
+                self.cancel_was_pushed = False
+                self.prog_bar["value"] = 0
+                self.prog_bar_cancel_button['state'] = tkinter.DISABLED
+                return
             self.prog_bar["value"] = self.prog_bar["value"] + 1
             self.prog_bar.update()
-
+        self.prog_bar_cancel_button['state'] = tkinter.DISABLED
         distance = np.array(distance)
         date_vector_for_matplotlib = mdates.date2num(date_vector)
 
@@ -1777,6 +1799,7 @@ class plot_application:
     def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation,iterations,tolerance,top,rev=0):
         ''' function to calculate porkchop plot and plot the array as heatmap'''
         top.destroy()
+        self.prog_bar_cancel_button['state'] = tkinter.NORMAL
         for object in self.current_objects:
             if object.displayname == selection1:
                 object1 = object
@@ -1815,6 +1838,11 @@ class plot_application:
                 counter2 = counter2 +1
                 if self.destroy_was_called:
                     return
+                if self.cancel_was_pushed:
+                    self.cancel_was_pushed = False
+                    self.prog_bar["value"] = 0
+                    self.prog_bar_cancel_button['state'] = tkinter.DISABLED
+                    return
             self.prog_bar["value"] = counter1
             self.prog_bar.update()
             counter1 = counter1 + 1
@@ -1822,7 +1850,7 @@ class plot_application:
         # for button in self.porkchop_radiobuttons:
         #     button.configure(state= 'normal')
 
-
+        self.prog_bar_cancel_button['state'] = tkinter.DISABLED
         date_list_1 = [datetime.datetime.strptime(vector[1],"A.D.%Y-%b-%d00:00:00.0000") for vector in vectors1 ]
         date_list = mdates.date2num(date_list_1)
         dV_array_depart = dV_array_depart * self.AUinKM
