@@ -352,7 +352,7 @@ class MVP_application:
         '''takes hex color code and returns rgb-alpha tuple'''
         h = h.strip('#')
         h = tuple(int(h[i:i+2], 16) for i in (0, 2 ,4))
-        h = (h[0]/256,h[1]/256,h[2]/256,alpha)
+        h = (h[0]/255,h[1]/255,h[2]/255,alpha)
         return h
 
     def save_file_as(self):
