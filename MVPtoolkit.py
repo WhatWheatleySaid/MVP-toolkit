@@ -738,7 +738,7 @@ class MVP_application:
             self.dt = self.calendar_widget.selection_get()
             batchfile['TLIST'] = "'" + str(sum(jdcal.gcal2jd(self.dt.year, self.dt.month, self.dt.day))) + "'"
             try:
-                r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile,timeout=2.0)
+                r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile)
             except (requests.exceptions.ConnectionError,requests.exceptions.Timeout):
                 print('connection failed, retrying...')
                 if errors<=2:
@@ -1654,7 +1654,7 @@ class MVP_application:
         batchfile['STEP_SIZE'] = "'"+str(resolution) + " " +time_format +"'"
 
         try:
-            r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile,timeout=2.0)
+            r = requests.get("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1", params = batchfile)
         except (requests.exceptions.ConnectionError,requests.exceptions.Timeout):
             print('connection failed, retrying...')
             if errors<=2:
