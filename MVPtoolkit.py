@@ -932,6 +932,7 @@ class MVP_application:
 
     def update_artist(self,object,artist_color_button,displayname,top):
         object.color = artist_color_button.cget('bg')
+        print(object.color)
         object.displayname = displayname
         self.redraw_current_objects()
         self.master.deiconify()
@@ -1245,7 +1246,7 @@ class MVP_application:
     def call_distance_menu(self):
         '''popup menu to choose objects and timerange to plot linear distance for'''
         distance_menu = distance_menu_toplevel(self)
-        
+
     def calculate_distance_plot(self,selection1,selection2,date1,date2,resolution = 12,time_format = 'h'):
         self.prog_bar_cancel_button['state'] = tkinter.NORMAL
         for object in self.current_objects:
