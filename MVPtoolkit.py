@@ -1216,72 +1216,6 @@ class MVP_application:
     def call_custom_object_menu(self):
         ''' call menu to choose custom object parameters'''
         custom_object_menu = custom_object_menu_toplevel(self)
-        # #validates an integer for tkinter entry
-        # def validate_int(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-        #
-        #     if not value_if_allowed:
-        #         return True
-        #     try:
-        #         int(value_if_allowed)
-        #         return True
-        #     except ValueError:
-        #         return False
-        # #validates an float for tkinter entry
-        # def validate_float(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-        #     if not value_if_allowed:
-        #         return True
-        #     try:
-        #         float(value_if_allowed)
-        #         return True
-        #     except ValueError:
-        #         return False
-        #
-        # top = tkinter.Toplevel(self.master)
-        # x = root.winfo_x()
-        # y = root.winfo_y()
-        # top.geometry("+%d+%d" % (x + 10, y + 20))
-        # top.title("add custom object")
-        # top.rowconfigure(0, weight=1)
-        # top.columnconfigure(0, weight=1)
-        #
-        # a_var = tkinter.StringVar()
-        # ecc_var = tkinter.StringVar()
-        # i_var = tkinter.StringVar()
-        # omega_var = tkinter.StringVar()
-        # OMEGA_var = tkinter.StringVar()
-        # anomaly_var = tkinter.StringVar()
-        # name_var = tkinter.StringVar()
-        # name_frame = tkinter.Frame(top,pady=10)
-        # kepler_frame = tkinter.LabelFrame(top,text='kepler elements',pady=10,padx=5)
-        # button_frame = tkinter.Frame(top)
-        # name_frame.rowconfigure(0, weight=1)
-        # name_frame.columnconfigure(0, weight=1)
-        # button_frame.rowconfigure(0, weight=1)
-        # button_frame.columnconfigure(0, weight=1)
-        # kepler_frame.rowconfigure(0, weight=1)
-        # kepler_frame.columnconfigure(0, weight=1)
-        # vcmd_int = (button_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        # vcmd_float = (button_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        # name_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        # kepler_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        # button_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        # tkinter.Label(name_frame,text='displayname').grid(row=0,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
-        # tkinter.Entry(name_frame,validate = 'key',textvariable=name_var).grid(row=0,column=1,columnspan=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        # kepler_array = [ ['semimajor axis:' , 'AU', a_var] , ['numerical eccentricity:' , '', ecc_var] , ['inclination:' , 'degrees', i_var] , ['argument of periapsis:' , 'degrees', omega_var] , ['longitude of the ascending node:' , 'degrees', OMEGA_var], ['true anomaly' , 'degrees', anomaly_var]]
-        # row_count = 0
-        # for element in kepler_array:
-        #     tkinter.Label(kepler_frame,text=element[0]).grid(row=row_count,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
-        #     tkinter.Entry(kepler_frame,validate = 'key', validatecommand=vcmd_float,textvariable=element[2]).grid(row=row_count,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        #     tkinter.Label(kepler_frame,text=element[1]).grid(row=row_count,column=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        #     row_count = row_count + 1
-        #
-        #
-        # tkinter.Button(button_frame,text='add to plot',command= lambda: self.add_custom_object(a_var,ecc_var,i_var,omega_var,OMEGA_var,anomaly_var,name_var,top)).grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        # tkinter.Button(button_frame,text='close',command= lambda: top.destroy() ).grid(row=0,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        #
-        # top.transient(self.master)
-        # top.resizable(width=False,height=False)
-        return
 
     def add_custom_object(self,a,ecc,i,omega,Omega,true_anomaly,name,top):
         ''' function to add a custom object to the current object list'''
@@ -1311,62 +1245,7 @@ class MVP_application:
     def call_distance_menu(self):
         '''popup menu to choose objects and timerange to plot linear distance for'''
         distance_menu = distance_menu_toplevel(self)
-        # choice_list = []
-        # choice_1_var = tkinter.StringVar()
-        # choice_2_var = tkinter.StringVar()
-        # for object in self.current_objects:
-        #     choice_list.append(object.displayname)
-        # if len(choice_list) < 2:
-        #     self.error_message('error','there must be atleast 2 objects to calculate a distance plot')
-        #     return
-        # choice_1_var.set(choice_list[0])
-        # choice_2_var.set(choice_list[1])
-        #
-        # top = tkinter.Toplevel(self.master)
-        # top.group(self.master)
-        # x = root.winfo_x()
-        # y = root.winfo_y()
-        # top.geometry("+%d+%d" % (x + 10, y + 20))
-        # top.title("distance plot generator")
-        # top.rowconfigure(0, weight=1)
-        # top.columnconfigure(0, weight=1)
-        # dropdown_frame = tkinter.Frame(top)
-        # button_frame = tkinter.Frame(top)
-        # dropdown_frame.columnconfigure(0, weight=1)
-        # dropdown_frame.rowconfigure(0, weight=1)
-        #
-        # dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        # object_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
-        # object_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        # object_frame.columnconfigure(0,weight=1)
-        # date_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
-        # date_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
-        # date_frame.columnconfigure(0,weight=1)
-        # button_frame.grid(row=2,column=0)
-        #
-        # choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
-        # choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
-        # cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
-        # cal2 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
-        #
-        # tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
-        # tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
-        # tkinter.Label(date_frame, text='from').grid(row=0,column=1)
-        # tkinter.Label(date_frame, text='to').grid(row=0,column=2)
-        # tkinter.Label(date_frame, text='date range:').grid(row=1,column=0,sticky=tkinter.W)
-        # choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
-        # choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
-        # cal1.grid(row=1,column = 1,sticky=tkinter.E+tkinter.W)
-        # cal2.grid(row=1,column = 2,sticky=tkinter.E+tkinter.W)
-        #
-        # close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        # calculate_button = tkinter.Button(button_frame,text='generate plot',command= lambda: self.calculate_distance_plot (choice_1_var.get(), choice_2_var.get(), cal1.get_date(), cal2.get_date() ) )
-        # close_button.grid(row=0,column=0)
-        # calculate_button.grid(row=0,column=1)
-        #
-        # top.resizable(width=False,height=False)
-        # top.transient(self.master)
-
+        
     def calculate_distance_plot(self,selection1,selection2,date1,date2,resolution = 12,time_format = 'h'):
         self.prog_bar_cancel_button['state'] = tkinter.NORMAL
         for object in self.current_objects:
