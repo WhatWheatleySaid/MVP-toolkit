@@ -391,6 +391,7 @@ class MVP_application:
 
     def get_color(self,b,parent):
         color=askcolor(b.cget('bg'),parent=parent)
+        print(color)
         if None in color:
             return
         b.configure(bg=color[1])
@@ -932,7 +933,6 @@ class MVP_application:
 
     def update_artist(self,object,artist_color_button,displayname,top):
         object.color = artist_color_button.cget('bg')
-        print(object.color)
         object.displayname = displayname
         self.redraw_current_objects()
         self.master.deiconify()
