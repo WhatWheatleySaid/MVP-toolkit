@@ -48,6 +48,9 @@ from matplotlib.backend_bases import key_press_handler
 #fix for freezing needs multiprocessing freeze support:
 import multiprocessing
 
+#all the menues for tools and other things
+from ToplevelMenues import preference_menu_toplevel, about_popup_toplevel, porkchop_menu_toplevel, lambert_menu_toplevel, distance_menu_toplevel, custom_object_menu_toplevel, artist_menu_toplevel
+
 class celestial_artist:
     def __init__(self,id,orbit,pos,date,name,text,keplers):
         self.id = id
@@ -66,7 +69,21 @@ class celestial_artist:
 
         self.keplers = keplers
 
-class plot_application:
+class Annotation3D(Annotation):
+    '''Annotate the point xyz with text s'''
+
+    def __init__(self, s, xyz, *args, **kwargs):
+        Annotation.__init__(self,s, xy=(0,0), *args, **kwargs)
+        self._verts3d = xyz
+
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.xy=(xs,ys)
+        Annotation.draw(self, renderer)
+
+class MVP_application:
     def __init__(self, master,pykep_installed):
         self.master = master
         self.master.withdraw()
@@ -187,18 +204,18 @@ class plot_application:
         self.filemenu.add_command(label="export figure as", command=self.save_file_as)
         self.filemenu.add_command(label="save plot", command=self.save_object_list)
         self.filemenu.add_command(label="load plot", command=self.load_object_list)
-        self.filemenu.add_command(label="preferences", command=self.preferences_menu)
+        self.filemenu.add_command(label="preferences", command=self.call_preferences_menu)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.master.quit)
 
         self.tools_menu = tkinter.Menu(self.menubar,tearoff = 0)
-        self.tools_menu.add_command(label='calculate rendezvous (lambert solver)', command=self.lambert_menu)
-        self.tools_menu.add_command(label='generate porkchop-plot', command=self.porkchop_menu)
-        self.tools_menu.add_command(label='add custom object', command=self.custom_object_menu)
-        self.tools_menu.add_command(label='plot linear distance over time', command=self.distance_menu)
+        self.tools_menu.add_command(label='calculate rendezvous (lambert solver)', command=self.call_lambert_menue)
+        self.tools_menu.add_command(label='generate porkchop-plot', command=self.call_porkchop_menu)
+        self.tools_menu.add_command(label='add custom object', command=self.call_custom_object_menu)
+        self.tools_menu.add_command(label='plot linear distance over time', command=self.call_distance_menu)
 
         self.about_menu = tkinter.Menu(self.menubar,tearoff = 0)
-        self.about_menu.add_command(label= 'about', command = self.about_popup)
+        self.about_menu.add_command(label= 'about', command = self.call_about_popup)
 
 
         self.menubar.add_cascade(label='file',menu=self.filemenu)
@@ -267,45 +284,9 @@ class plot_application:
     def cancel_current_task(self):
         self.cancel_was_pushed = True
 
-    def about_popup(self):
-        top = tkinter.Toplevel()
+    def call_about_popup(self):
+        about_popup = about_popup_toplevel(self)
 
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title('about')
-
-
-        tabcontrol = ttk.Notebook(top)
-        copyright_tab = ttk.Frame(tabcontrol)
-        license_tab = ttk.Frame(tabcontrol)
-        tabcontrol.add(copyright_tab, text = 'copyright')
-        tabcontrol.add(license_tab, text = 'GPL-3.0 license')
-        tabcontrol.grid(row=0,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
-        copyright_text = tkinter.Text(copyright_tab)
-        copyright_text.tag_configure("center",justify='center')
-        copyright_text.insert(tkinter.END,'MVP-toolkit {0}\n(C) 2019 by Alexander M. Bauer under GPL-3.0 license\n\n'.format(self.version))
-        copyright_text.insert(tkinter.END,'Algorythms for lambert problem solving:\n PyKEP (c) by ESA(pykep dev-Team) under GPL-3.0\n\nplotting and graphing:\n Matplotlib, see matplotlib.org\n\ndata by NASA JPL-HORIZONS, see https://ssd.jpl.nasa.gov/horizons.cgi#top\n\n')
-        copyright_text.tag_add('center', "1.0", "end")
-        copyright_text.config(state=tkinter.DISABLED)
-        copyright_text.grid(row=0,column=0)
-
-        license_text = tkinter.Text(license_tab)
-        license_text.insert(tkinter.END, self.license_text)
-        license_text.pack()
-    class Annotation3D(Annotation):
-        '''Annotate the point xyz with text s'''
-
-        def __init__(self, s, xyz, *args, **kwargs):
-            Annotation.__init__(self,s, xy=(0,0), *args, **kwargs)
-            self._verts3d = xyz
-
-
-        def draw(self, renderer):
-            xs3d, ys3d, zs3d = self._verts3d
-            xs, ys, zs = proj_transform(xs3d, ys3d, zs3d, renderer.M)
-            self.xy=(xs,ys)
-            Annotation.draw(self, renderer)
 
     def set_default_colors(self,redraw=False,buttons=None):
         '''sets colors to default, if buttons handed over: colors them accordingly'''
@@ -414,60 +395,9 @@ class plot_application:
             return
         b.configure(bg=color[1])
 
-    def preferences_menu(self):
-        '''toplevel menu to adjust config file'''
-        def validate(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-            if text in '0123456789.-+':
-                try:
-                    float(value_if_allowed)
-                    return True
-                except ValueError:
-                    return False
-            else:
-                return False
-
-        top = tkinter.Toplevel()
-
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("preferences")
-
-        textsize_var = tkinter.StringVar()
-        textsize_var.set(str(self.textsize))
-
-        appearance_frame =  tkinter.LabelFrame(top, text= 'appearance')
-        appearance_frame.grid(row=0,column= 0)
-
-        button_frame = tkinter.Frame(top)
-        button_frame.grid(row=1,column=0)
-
-        vcmd = (appearance_frame.register(validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-
-        tkinter.Label(appearance_frame,text='background color:').grid(row=0,column=0,sticky=tkinter.W)
-        custom_color_button = tkinter.Button(appearance_frame,text='',bg = self.custom_color ,command=lambda: self.get_color(custom_color_button,top), width=10)
-        custom_color_button.grid(row=0,column=1,sticky=tkinter.E)
-        tkinter.Label(appearance_frame,text='grid color:').grid(row=1,column=0,sticky=tkinter.W)
-        grid_color_button = tkinter.Button(appearance_frame,text='',bg = self.gridcolor ,command=lambda: self.get_color(grid_color_button,top), width=10)
-        grid_color_button.grid(row=1,column=1,sticky=tkinter.E)
-        tkinter.Label(appearance_frame,text='text color:').grid(row=2,column=0,sticky=tkinter.W)
-        text_color_button = tkinter.Button(appearance_frame,text='',bg = self.text_color ,command=lambda: self.get_color(text_color_button,top), width=10)
-        text_color_button.grid(row=2,column=1,sticky=tkinter.E)
-        tkinter.Label(appearance_frame,text='pane color:').grid(row=3,column=0,sticky=tkinter.W)
-        pane_color_button = tkinter.Button(appearance_frame,text='',bg = self.pane_color ,command=lambda: self.get_color(pane_color_button,top), width=10)
-        pane_color_button.grid(row=3,column=1,sticky=tkinter.E)
-
-        tkinter.Label(appearance_frame,text='textsize:').grid(row=4,column=0,sticky=tkinter.W)
-        tkinter.Entry(appearance_frame, validate='key', validatecommand = vcmd,textvariable=textsize_var).grid(row=4,column=1,sticky=tkinter.E)
-
-        dismiss_button = tkinter.Button(button_frame, text="cancel", command=top.destroy)
-        dismiss_button.grid(row=0,column=0)
-        accept_button = tkinter.Button(button_frame, text="save and apply", command = lambda: self.update_config_vars(custom_color_button,grid_color_button,text_color_button,pane_color_button,textsize_var.get()))
-        accept_button.grid(row=0,column=1)
-        default_button = tkinter.Button(button_frame, text='default colors', command = lambda: self.set_default_colors(redraw=True,buttons =[custom_color_button,grid_color_button,text_color_button,pane_color_button] ))
-        default_button.grid(row=0,column=3)
-        top.resizable(width=False,height=False)
-        top.transient(self.master)
+    def call_preferences_menu(self):
+        '''call toplevel menu to adjust config file'''
+        preference_menu = preference_menu_toplevel(self)
 
     def update_config_vars(self,custom_color_button,grid_color_button,text_color_button,pane_color_button,textsize_var):
         '''get colors of preference buttons, update config file and redraw figure with new colors'''
@@ -482,7 +412,7 @@ class plot_application:
     def annotate3D(self,ax, s, *args, **kwargs):
         '''add anotation text s to to Axes3d ax'''
 
-        tag = self.Annotation3D(s, *args, **kwargs)
+        tag = Annotation3D(s, *args, **kwargs)
         ax.add_artist(tag)
         return tag
 
@@ -936,7 +866,7 @@ class plot_application:
             self.current_center_object = selected_object
             self.set_camera_center(selected_object.pos)
         elif event.mouseevent.button == 3:
-            self.artist_menu(selected_object)
+            self.call_artist_menu(selected_object)
 
     def set_camera_center(self,pos):
         '''centers camera around pos = [x,y,z]'''
@@ -954,52 +884,9 @@ class plot_application:
         self.ax.set_zlim([-max+pos[2], max+pos[2]])
         self.canvas.draw()
 
-    def artist_menu(self,object):
-        ''' popup menu to alter artist color and name or remove artist'''
-        top = tkinter.Toplevel()
-
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("{0}".format(object.displayname))
-
-
-        tabcontrol = ttk.Notebook(top)
-        parameters_tab = ttk.Frame(tabcontrol)
-        info_text_tab = ttk.Frame(tabcontrol)
-        tabcontrol.add(parameters_tab, text = 'object parameters')
-        tabcontrol.add(info_text_tab, text = 'DB information')
-        tabcontrol.grid(row=0,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
-
-        button_frame = ttk.Frame(top)
-        button_frame.grid(row=1,column=0)
-        displayname_var = tkinter.StringVar()
-        displayname_var.set(str(object.displayname))
-
-
-        info_text_widget = tkinter.Text(info_text_tab)
-        info_text_widget.insert(tkinter.END,object.info_text)
-        info_text_widget.config(state=tkinter.DISABLED)
-        info_text_widget.grid(row=0,column=0)
-        settings_frame =  tkinter.LabelFrame(parameters_tab, text= 'parameters')
-        settings_frame.grid(row=0,column= 0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
-
-        tkinter.Label(settings_frame,text='object color:').grid(row=0,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
-        artist_color_button = tkinter.Button(settings_frame,text='',bg = object.color ,command=lambda: self.get_color(artist_color_button,top), width=10)
-        artist_color_button.grid(row=0,column=1,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
-
-        tkinter.Label(settings_frame,text='displayname:').grid(row=2,column=0,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
-        tkinter.Entry(settings_frame,textvariable=displayname_var).grid(row=2,column=1,sticky= tkinter.S+tkinter.N+tkinter.W+tkinter.E)
-
-        dismiss_button = tkinter.Button(button_frame, text="cancel", command=lambda: self.destroy_toplevel(top))
-        dismiss_button.grid(row=0,column=0)
-        accept_button = tkinter.Button(button_frame, text="apply changes", command = lambda: self.update_artist(object,artist_color_button,displayname_var.get(),top))
-        accept_button.grid(row=0,column=1)
-        remove_button = tkinter.Button(button_frame, text="remove this from plot", command = lambda: self.remove_artist(object,top))
-        remove_button.grid(row=0,column=2)
-        top.resizable(width=False,height=False)
-        top.transient(self.master)
-        root.tk.call('wm','iconphoto',top._w,icon_img)
+    def call_artist_menu(self,object):
+        ''' call popup menu to alter artist color and name or remove artist'''
+        artist_menu = artist_menu_toplevel(self,object)
 
     def remove_artist(self,object,top):
         try:
@@ -1293,54 +1180,9 @@ class plot_application:
         else:
             return ecc, inclination, Omega, omega, true_anomaly
 
-    def lambert_menu(self):
-        ''' menu to choose parameters for the lambert solver to plot a rendeszvous orbit'''
-        choice_1_var = tkinter.StringVar()
-        choice_2_var = tkinter.StringVar()
-
-        choice_list = []
-        for object in self.current_objects:
-            choice_list.append(object.displayname)
-        if len(choice_list) < 2:
-            self.error_message('error','there must be atleast 2 objects to plan a rendezvous')
-            return
-        choice_1_var.set(choice_list[0])
-        choice_2_var.set(choice_list[1])
-
-        top = tkinter.Toplevel(self.master)
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("rendezvous tool")
-        top.rowconfigure(0, weight=1)
-        top.columnconfigure(0, weight=1)
-        dropdown_frame = tkinter.Frame(top)
-        info_frame = tkinter.Frame(top)
-        button_frame = tkinter.Frame(top)
-        dropdown_frame.columnconfigure(0, weight=1)
-        info_frame.columnconfigure(0, weight=1)
-        dropdown_frame.rowconfigure(0, weight=1)
-        info_frame.rowconfigure(0, weight=1)
-
-        dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        info_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
-        button_frame.grid(row=2,column=0)
-        choice_1 = tkinter.OptionMenu(dropdown_frame, choice_1_var, *choice_list)
-        choice_2 = tkinter.OptionMenu(dropdown_frame, choice_2_var, *choice_list)
-        tkinter.Label(dropdown_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
-        tkinter.Label(dropdown_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
-        choice_1.grid(row=0,column=1,sticky=tkinter.E)
-        choice_2.grid(row=1,column=1,sticky=tkinter.E)
-
-        info_text_widget = tkinter.Label(info_frame,text = 'Attention: Always check for plausibility of the solution!\n This tool can calculate a rendezvous between two\n points in space with an elliptical transfer. \nYou have to plot the two desired objects on their\n corresponding dates first to plan a rendezvous between them.\n It is advised to make a porkchop-plot first!')
-        info_text_widget.grid(row=0,column=0)
-
-        close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='calculate!',command=lambda : self.calc_rendezvous_pykep(choice_1_var.get(),choice_2_var.get()))
-        close_button.grid(row=0,column=0)
-        calculate_button.grid(row=0,column=1)
-        top.transient(self.master)
-        top.resizable(width=False,height=False)
+    def call_lambert_menue(self):
+        ''' call menu to choose parameters for the lambert solver to plot a rendeszvous orbit'''
+        lambert_menu = lambert_menu_toplevel(self)
         return
 
     def calc_approx__timefree_dv(self,object1,object2, dt):
@@ -1371,73 +1213,74 @@ class plot_application:
         print(roots)
         return
 
-    def custom_object_menu(self):
-        ''' menu to choose custom object parameters'''
-        #validates an integer for tkinter entry
-        def validate_int(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-
-            if not value_if_allowed:
-                return True
-            try:
-                int(value_if_allowed)
-                return True
-            except ValueError:
-                return False
-        #validates an float for tkinter entry
-        def validate_float(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-            if not value_if_allowed:
-                return True
-            try:
-                float(value_if_allowed)
-                return True
-            except ValueError:
-                return False
-
-        top = tkinter.Toplevel(self.master)
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("add custom object")
-        top.rowconfigure(0, weight=1)
-        top.columnconfigure(0, weight=1)
-
-        a_var = tkinter.StringVar()
-        ecc_var = tkinter.StringVar()
-        i_var = tkinter.StringVar()
-        omega_var = tkinter.StringVar()
-        OMEGA_var = tkinter.StringVar()
-        anomaly_var = tkinter.StringVar()
-        name_var = tkinter.StringVar()
-        name_frame = tkinter.Frame(top,pady=10)
-        kepler_frame = tkinter.LabelFrame(top,text='kepler elements',pady=10,padx=5)
-        button_frame = tkinter.Frame(top)
-        name_frame.rowconfigure(0, weight=1)
-        name_frame.columnconfigure(0, weight=1)
-        button_frame.rowconfigure(0, weight=1)
-        button_frame.columnconfigure(0, weight=1)
-        kepler_frame.rowconfigure(0, weight=1)
-        kepler_frame.columnconfigure(0, weight=1)
-        vcmd_int = (button_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        vcmd_float = (button_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        name_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        kepler_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        button_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        tkinter.Label(name_frame,text='displayname').grid(row=0,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
-        tkinter.Entry(name_frame,validate = 'key',textvariable=name_var).grid(row=0,column=1,columnspan=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        kepler_array = [ ['semimajor axis:' , 'AU', a_var] , ['numerical eccentricity:' , '', ecc_var] , ['inclination:' , 'degrees', i_var] , ['argument of periapsis:' , 'degrees', omega_var] , ['longitude of the ascending node:' , 'degrees', OMEGA_var], ['true anomaly' , 'degrees', anomaly_var]]
-        row_count = 0
-        for element in kepler_array:
-            tkinter.Label(kepler_frame,text=element[0]).grid(row=row_count,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
-            tkinter.Entry(kepler_frame,validate = 'key', validatecommand=vcmd_float,textvariable=element[2]).grid(row=row_count,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-            tkinter.Label(kepler_frame,text=element[1]).grid(row=row_count,column=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-            row_count = row_count + 1
-
-
-        tkinter.Button(button_frame,text='add to plot',command= lambda: self.add_custom_object(a_var,ecc_var,i_var,omega_var,OMEGA_var,anomaly_var,name_var,top)).grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-        tkinter.Button(button_frame,text='close',command= lambda: top.destroy() ).grid(row=0,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
-
-        top.transient(self.master)
-        top.resizable(width=False,height=False)
+    def call_custom_object_menu(self):
+        ''' call menu to choose custom object parameters'''
+        custom_object_menu = custom_object_menu_toplevel(self)
+        # #validates an integer for tkinter entry
+        # def validate_int(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+        #
+        #     if not value_if_allowed:
+        #         return True
+        #     try:
+        #         int(value_if_allowed)
+        #         return True
+        #     except ValueError:
+        #         return False
+        # #validates an float for tkinter entry
+        # def validate_float(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
+        #     if not value_if_allowed:
+        #         return True
+        #     try:
+        #         float(value_if_allowed)
+        #         return True
+        #     except ValueError:
+        #         return False
+        #
+        # top = tkinter.Toplevel(self.master)
+        # x = root.winfo_x()
+        # y = root.winfo_y()
+        # top.geometry("+%d+%d" % (x + 10, y + 20))
+        # top.title("add custom object")
+        # top.rowconfigure(0, weight=1)
+        # top.columnconfigure(0, weight=1)
+        #
+        # a_var = tkinter.StringVar()
+        # ecc_var = tkinter.StringVar()
+        # i_var = tkinter.StringVar()
+        # omega_var = tkinter.StringVar()
+        # OMEGA_var = tkinter.StringVar()
+        # anomaly_var = tkinter.StringVar()
+        # name_var = tkinter.StringVar()
+        # name_frame = tkinter.Frame(top,pady=10)
+        # kepler_frame = tkinter.LabelFrame(top,text='kepler elements',pady=10,padx=5)
+        # button_frame = tkinter.Frame(top)
+        # name_frame.rowconfigure(0, weight=1)
+        # name_frame.columnconfigure(0, weight=1)
+        # button_frame.rowconfigure(0, weight=1)
+        # button_frame.columnconfigure(0, weight=1)
+        # kepler_frame.rowconfigure(0, weight=1)
+        # kepler_frame.columnconfigure(0, weight=1)
+        # vcmd_int = (button_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        # vcmd_float = (button_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        # name_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        # kepler_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        # button_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        # tkinter.Label(name_frame,text='displayname').grid(row=0,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
+        # tkinter.Entry(name_frame,validate = 'key',textvariable=name_var).grid(row=0,column=1,columnspan=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        # kepler_array = [ ['semimajor axis:' , 'AU', a_var] , ['numerical eccentricity:' , '', ecc_var] , ['inclination:' , 'degrees', i_var] , ['argument of periapsis:' , 'degrees', omega_var] , ['longitude of the ascending node:' , 'degrees', OMEGA_var], ['true anomaly' , 'degrees', anomaly_var]]
+        # row_count = 0
+        # for element in kepler_array:
+        #     tkinter.Label(kepler_frame,text=element[0]).grid(row=row_count,column=0,sticky=tkinter.W+tkinter.N+tkinter.S)
+        #     tkinter.Entry(kepler_frame,validate = 'key', validatecommand=vcmd_float,textvariable=element[2]).grid(row=row_count,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        #     tkinter.Label(kepler_frame,text=element[1]).grid(row=row_count,column=2,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        #     row_count = row_count + 1
+        #
+        #
+        # tkinter.Button(button_frame,text='add to plot',command= lambda: self.add_custom_object(a_var,ecc_var,i_var,omega_var,OMEGA_var,anomaly_var,name_var,top)).grid(row=0,column=0,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        # tkinter.Button(button_frame,text='close',command= lambda: top.destroy() ).grid(row=0,column=1,sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+        #
+        # top.transient(self.master)
+        # top.resizable(width=False,height=False)
         return
 
     def add_custom_object(self,a,ecc,i,omega,Omega,true_anomaly,name,top):
@@ -1465,63 +1308,64 @@ class plot_application:
 
         return
 
-    def distance_menu(self):
+    def call_distance_menu(self):
         '''popup menu to choose objects and timerange to plot linear distance for'''
-        choice_list = []
-        choice_1_var = tkinter.StringVar()
-        choice_2_var = tkinter.StringVar()
-        for object in self.current_objects:
-            choice_list.append(object.displayname)
-        if len(choice_list) < 2:
-            self.error_message('error','there must be atleast 2 objects to calculate a distance plot')
-            return
-        choice_1_var.set(choice_list[0])
-        choice_2_var.set(choice_list[1])
-
-        top = tkinter.Toplevel(self.master)
-        top.group(self.master)
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("distance plot generator")
-        top.rowconfigure(0, weight=1)
-        top.columnconfigure(0, weight=1)
-        dropdown_frame = tkinter.Frame(top)
-        button_frame = tkinter.Frame(top)
-        dropdown_frame.columnconfigure(0, weight=1)
-        dropdown_frame.rowconfigure(0, weight=1)
-
-        dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        object_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
-        object_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        object_frame.columnconfigure(0,weight=1)
-        date_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
-        date_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
-        date_frame.columnconfigure(0,weight=1)
-        button_frame.grid(row=2,column=0)
-
-        choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
-        choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
-        cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
-        cal2 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
-
-        tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
-        tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
-        tkinter.Label(date_frame, text='from').grid(row=0,column=1)
-        tkinter.Label(date_frame, text='to').grid(row=0,column=2)
-        tkinter.Label(date_frame, text='date range:').grid(row=1,column=0,sticky=tkinter.W)
-        choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
-        choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
-        cal1.grid(row=1,column = 1,sticky=tkinter.E+tkinter.W)
-        cal2.grid(row=1,column = 2,sticky=tkinter.E+tkinter.W)
-
-        close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='generate plot',command= lambda: self.calculate_distance_plot (choice_1_var.get(), choice_2_var.get(), cal1.get_date(), cal2.get_date() ) )
-        close_button.grid(row=0,column=0)
-        calculate_button.grid(row=0,column=1)
-
-        top.resizable(width=False,height=False)
-        top.transient(self.master)
+        distance_menu = distance_menu_toplevel(self)
+        # choice_list = []
+        # choice_1_var = tkinter.StringVar()
+        # choice_2_var = tkinter.StringVar()
+        # for object in self.current_objects:
+        #     choice_list.append(object.displayname)
+        # if len(choice_list) < 2:
+        #     self.error_message('error','there must be atleast 2 objects to calculate a distance plot')
+        #     return
+        # choice_1_var.set(choice_list[0])
+        # choice_2_var.set(choice_list[1])
+        #
+        # top = tkinter.Toplevel(self.master)
+        # top.group(self.master)
+        # x = root.winfo_x()
+        # y = root.winfo_y()
+        # top.geometry("+%d+%d" % (x + 10, y + 20))
+        # top.title("distance plot generator")
+        # top.rowconfigure(0, weight=1)
+        # top.columnconfigure(0, weight=1)
+        # dropdown_frame = tkinter.Frame(top)
+        # button_frame = tkinter.Frame(top)
+        # dropdown_frame.columnconfigure(0, weight=1)
+        # dropdown_frame.rowconfigure(0, weight=1)
+        #
+        # dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        # object_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
+        # object_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
+        # object_frame.columnconfigure(0,weight=1)
+        # date_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
+        # date_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
+        # date_frame.columnconfigure(0,weight=1)
+        # button_frame.grid(row=2,column=0)
+        #
+        # choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
+        # choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
+        # cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
+        # cal2 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
+        #
+        # tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
+        # tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
+        # tkinter.Label(date_frame, text='from').grid(row=0,column=1)
+        # tkinter.Label(date_frame, text='to').grid(row=0,column=2)
+        # tkinter.Label(date_frame, text='date range:').grid(row=1,column=0,sticky=tkinter.W)
+        # choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
+        # choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
+        # cal1.grid(row=1,column = 1,sticky=tkinter.E+tkinter.W)
+        # cal2.grid(row=1,column = 2,sticky=tkinter.E+tkinter.W)
+        #
+        # close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
+        # calculate_button = tkinter.Button(button_frame,text='generate plot',command= lambda: self.calculate_distance_plot (choice_1_var.get(), choice_2_var.get(), cal1.get_date(), cal2.get_date() ) )
+        # close_button.grid(row=0,column=0)
+        # calculate_button.grid(row=0,column=1)
+        #
+        # top.resizable(width=False,height=False)
+        # top.transient(self.master)
 
     def calculate_distance_plot(self,selection1,selection2,date1,date2,resolution = 12,time_format = 'h'):
         self.prog_bar_cancel_button['state'] = tkinter.NORMAL
@@ -1644,156 +1488,9 @@ class plot_application:
         self.notebook.add(distance_frame,text='{0} <-> {1}'.format(name1,name2))
         self.notebook.select(self.notebook.tabs()[-1])
 
-    def porkchop_menu(self):
-        ''' popup menu to choose parameters for porkchop plot generation'''
-
-        #validates an integer for tkinter entry
-        def validate_int(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-
-            if not value_if_allowed:
-                return True
-            try:
-                int(value_if_allowed)
-                return True
-            except ValueError:
-                return False
-        #validates an float for tkinter entry
-        def validate_float(action, index, value_if_allowed,prior_value, text, validation_type, trigger_type, widget_name):
-            if not value_if_allowed:
-                return True
-            try:
-                float(value_if_allowed)
-                return True
-            except ValueError:
-                return False
-
-        def Entry_Callback(event):
-            resolution_entry.selection_range(0, tkinter.END)
-
-        choice_1_var = tkinter.StringVar()
-        choice_2_var = tkinter.StringVar()
-        resolution_var = tkinter.StringVar()
-        resolution_var.set('10')
-        iteration_var = tkinter.StringVar()
-        iteration_var.set('50')
-        tolerance_var = tkinter.StringVar()
-        tolerance_var.set('0.0001')
-        revolution_list = [ '0' , '1' , '2' , '3' , '4' , '5' ]
-        revolution_var = tkinter.StringVar()
-        revolution_var.set('0')
-        interpolation_list = ['none', 'nearest', 'bilinear', 'bicubic', 'spline16', 'spline36', 'hanning', 'hamming', 'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian', 'bessel', 'mitchell', 'sinc', 'lanczos']
-        interpolation_var = tkinter.StringVar()
-        interpolation_var.set('bilinear')
-        if not self.pykep_installed:
-            pulse_direction_options = [('prograde','prograde') , ('retrograde','retrograde') , ('both', 'both')]
-        else:
-            pulse_direction_options = [('prograde','prograde') , ('retrograde','retrograde')]
-
-        dV_options = [('launch','launch') , ('arrival' , 'arrival') , ('both','both')]
-
-
-        choice_list = []
-        for object in self.current_objects:
-            choice_list.append(object.displayname)
-        if len(choice_list) < 2:
-            self.error_message('error','there must be atleast 2 objects to calculate a porkchop plot')
-            return
-        choice_1_var.set(choice_list[0])
-        choice_2_var.set(choice_list[1])
-
-        top = tkinter.Toplevel(self.master)
-        top.group(self.master)
-        x = root.winfo_x()
-        y = root.winfo_y()
-        top.geometry("+%d+%d" % (x + 10, y + 20))
-        top.title("porkchop plot generator")
-        top.rowconfigure(0, weight=1)
-        top.columnconfigure(0, weight=1)
-        dropdown_frame = tkinter.Frame(top)
-        button_frame = tkinter.Frame(top)
-        dropdown_frame.columnconfigure(0, weight=1)
-        dropdown_frame.rowconfigure(0, weight=1)
-
-
-        dropdown_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        object_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
-        object_frame.grid(row=0,column=0,sticky=tkinter.W+tkinter.E)
-        object_frame.columnconfigure(0,weight=1)
-        date_frame = tkinter.Frame(dropdown_frame,borderwidth=4)
-        date_frame.grid(row=1,column=0,sticky=tkinter.W+tkinter.E)
-        date_frame.columnconfigure(0,weight=1)
-        misc_frame = tkinter.LabelFrame(dropdown_frame,text='advanced settings',pady=5,padx=5)
-        misc_frame.grid(row=2,column=0,sticky=tkinter.W+tkinter.E)
-        misc_frame.columnconfigure(0,weight=1)
-        button_frame.grid(row=2,column=0)
-
-        vcmd_int = (dropdown_frame.register(validate_int),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        vcmd_float = (dropdown_frame.register(validate_float), '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-
-        choice_1 = tkinter.OptionMenu(object_frame, choice_1_var, *choice_list)
-        choice_2 = tkinter.OptionMenu(object_frame, choice_2_var, *choice_list)
-        cal1 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year, month=self.dt.month, day=self.dt.day)
-        cal2 = DateEntry(date_frame,dateformat=3,width=12, background='darkblue',foreground='white', borderwidth=4,Calendar =2018,year=self.dt.year+3, month=self.dt.month, day=self.dt.day)
-        resolution_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_int,textvariable=resolution_var)
-        resolution_entry.bind("<FocusIn>",Entry_Callback)
-        iteration_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_int ,textvariable=iteration_var)
-        tolerance_entry = tkinter.Entry(misc_frame,validate = 'key', validatecommand=vcmd_float ,textvariable=tolerance_var)
-        interpolation_choice = tkinter.OptionMenu(misc_frame, interpolation_var, *interpolation_list)
-        revolution_choice = tkinter.OptionMenu(misc_frame, revolution_var, *revolution_list )
-
-        tkinter.Label(object_frame,text='start object:').grid(row=0,column=0,sticky=tkinter.W)
-        tkinter.Label(object_frame,text='target object:').grid(row=1,column=0,sticky=tkinter.W)
-        tkinter.Label(date_frame, text='from').grid(row=0,column=1)
-        tkinter.Label(date_frame, text='to').grid(row=0,column=2)
-        tkinter.Label(date_frame, text='date range:').grid(row=1,column=0,sticky=tkinter.W)
-        tkinter.Label(misc_frame, text='resolution in days:').grid(row=0,column=0,sticky=tkinter.W)
-        tkinter.Label(misc_frame, text='image interpolation:').grid(row=1,column=0,sticky=tkinter.W)
-        if not self.pykep_installed:
-            tkinter.Label(misc_frame, text='number of iterations:').grid(row=2,column=0,sticky=tkinter.W)
-            tkinter.Label(misc_frame, text='numerical tolerance:').grid(row=3,column=0,sticky=tkinter.W)
-        else:
-            # tkinter.Label(misc_frame, text='number of revolutions:').grid(row = 2,column =0, sticky= tkinter.W)
-            pass
-
-        choice_1.grid(row=0,column=1,columnspan=2,sticky=tkinter.E)
-        choice_2.grid(row=1,column=1,columnspan=2,sticky=tkinter.E)
-        cal1.grid(row=1,column = 1,sticky=tkinter.E+tkinter.W)
-        cal2.grid(row=1,column = 2,sticky=tkinter.E+tkinter.W)
-        resolution_entry.grid(row=0,column=2,sticky=tkinter.E)
-        interpolation_choice.grid(row=1,column=2,sticky=tkinter.E)
-        if not self.pykep_installed:
-            iteration_entry.grid(row=2,column=2, sticky = tkinter.E)
-            tolerance_entry.grid(row=3,column=2,sticky=tkinter.E)
-        else:
-            # revolution_choice.grid(row=2,column=2,sticky=tkinter.E)
-            pass
-        #############radiobuttons###############
-        pulse_frame = tkinter.LabelFrame(misc_frame, text= 'pulse direction')
-        # pulse_frame.columnconfigure(0,weight=1)
-        pulse_frame.grid(row = 4 ,column = 0, columnspan = 3,sticky= tkinter.W )
-        count = 0
-        for text,mode in pulse_direction_options:
-            b = tkinter.Radiobutton(pulse_frame,text=text,variable = self.pulse_direction_var , value = mode)
-            b.grid(row=0 , column=count)
-            self.porkchop_radiobuttons.append(b)
-            count = count + 1
-        dV_frame = tkinter.LabelFrame(misc_frame,text = 'delta-V')
-        # dV_frame.columnconfigure(0,weight=1)
-        dV_frame.grid(row = 5,column = 0, columnspan = 3,sticky= tkinter.W )
-        count=0
-        for text,mode in dV_options:
-            b = tkinter.Radiobutton(dV_frame, text=text,variable= self.dV_var , value = mode)
-            b.grid(row=0, column = count )
-            self.porkchop_radiobuttons.append(b)
-            count = count + 1
-        #######################################
-
-        close_button = tkinter.Button(button_frame,text='close',command=top.destroy)
-        calculate_button = tkinter.Button(button_frame,text='generate plot',command=lambda : self.calc_porkchop(choice_1_var.get(),choice_2_var.get() , int(resolution_var.get()),cal1.get_date(),cal2.get_date() , interpolation_var.get(), int(iteration_var.get()), float(tolerance_var.get()) , top, rev=int(revolution_var.get())))
-        close_button.grid(row=0,column=0)
-        calculate_button.grid(row=0,column=1)
-        top.resizable(width=False,height=False)
-        top.transient(self.master)
+    def call_porkchop_menu(self):
+        ''' call popup menu to choose parameters for porkchop plot generation'''
+        porkchop_menu = porkchop_menu_toplevel(self)
 
     def calc_porkchop(self,selection1,selection2,resolution,date1,date2,interpolation,iterations,tolerance,top,rev=0):
         ''' function to calculate porkchop plot and plot the array as heatmap'''
@@ -2009,5 +1706,5 @@ if __name__ == '__main__':
     root.tk.call('wm','iconphoto',root._w,icon_img)
     tkinter.Grid.rowconfigure(root, 0, weight=1)
     tkinter.Grid.columnconfigure(root, 0, weight=1)
-    gui = plot_application(root,pykep_installed)
+    gui = MVP_application(root,pykep_installed)
     root.mainloop()
