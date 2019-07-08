@@ -935,7 +935,7 @@ class MVP_application:
         top.destroy()
 
     def update_artist(self,object,artist_color_button,displayname,top):
-        object.color = self.hex_to_rgb(artist_color_button.cget('bg'))
+        object.color = artist_color_button.cget('bg')
         print(object.color)
         object.displayname = displayname
         self.redraw_current_objects()
