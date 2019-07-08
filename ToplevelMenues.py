@@ -355,8 +355,8 @@ class porkchop_menu_toplevel(tkinter.Toplevel):
         if len(self.choice_list) < 2:
             self.parent.error_message('error','there must be atleast 2 objects to calculate a porkchop plot')
             return
-        self.choice_1_var.set(self.choice_list[0])
-        self.choice_2_var.set(self.choice_list[1])
+        self.choice_1_var.set(self.choice_list[1])
+        self.choice_2_var.set(self.choice_list[0])
 
         self.group(self.parent.master)
         x = self.parent.master.winfo_x()
