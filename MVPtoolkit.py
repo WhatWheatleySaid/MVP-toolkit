@@ -350,7 +350,10 @@ class MVP_application:
 
     def hex_to_rgb(self,h,alpha=1):
         '''takes hex color code and returns rgb-alpha tuple'''
-        h = h.strip('#')
+        try:
+            h = h.strip('#')
+        except:
+            return h
         h = tuple(int(h[i:i+2], 16) for i in (0, 2 ,4))
         h = (h[0]/255,h[1]/255,h[2]/255,alpha)
         return h
@@ -932,7 +935,7 @@ class MVP_application:
         top.destroy()
 
     def update_artist(self,object,artist_color_button,displayname,top):
-        object.color = artist_color_button.cget('bg')
+        object.color = self.hex_to_rgb(artist_color_button.cget('bg'))
         print(object.color)
         object.displayname = displayname
         self.redraw_current_objects()
