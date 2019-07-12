@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import telnetlib
 import re
+import os
 from pprint import pprint
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.proj3d import proj_transform
@@ -87,6 +88,13 @@ class MVP_application:
     def __init__(self, master,pykep_installed):
         self.master = master
         self.master.withdraw()
+
+        #check if OS is windows or not
+        if os.name == 'nt':
+            self.is_Windows = True
+        else:
+            self.is_Windows = False
+
         self.pykep_installed = pykep_installed
         self.AUinKM = 149597870.691 #km/AU
         self.G = 6.673e-20 / np.power(self.AUinKM,3) #km³/kg*s²
@@ -303,27 +311,49 @@ class MVP_application:
 
     def check_config(self):
         '''check if config exists, makes default config if not'''
-        file = Path("./config.ini")
-        config = configparser.ConfigParser()
-        if file.is_file():
-            print('config found, reading from ./config.ini')
-            config.read('config.ini')
-            self.custom_color = config['appearance']['custom_color']
-            self.gridcolor = config['appearance']['gridcolor']
-            self.text_color = config['appearance']['text_color']
-            self.pane_color = config['appearance']['pane_color']
-            self.gridlinewidth = float(config['appearance']['gridlinewidth'])
-            self.textsize = float(config['appearance']['textsize'])
-            self.markersize = float(config['appearance']['markersize'])
-            self.orbit_linewidth = float(config['appearance']['orbit_linewidth'])
-            self.refplane_linewidth = float(config['appearance']['refplane_linewidth'])
-            self.text_xoffset = float(config['appearance']['text_xoffset'])
-            self.text_yoffset = float(config['appearance']['text_yoffset'])
-
-
+        if self.is_Windows:
+            file = os.getenv('APPDATA')
+            file = file + r"\MVPtoolkit\config.ini"
+            config = configparser.ConfigParser()
+            if file.isfile():
+                print(r'config found, reading from ~APPDATA~\config.ini')
+                config.read(file)
+                self.custom_color = config['appearance']['custom_color']
+                self.gridcolor = config['appearance']['gridcolor']
+                self.text_color = config['appearance']['text_color']
+                self.pane_color = config['appearance']['pane_color']
+                self.gridlinewidth = float(config['appearance']['gridlinewidth'])
+                self.textsize = float(config['appearance']['textsize'])
+                self.markersize = float(config['appearance']['markersize'])
+                self.orbit_linewidth = float(config['appearance']['orbit_linewidth'])
+                self.refplane_linewidth = float(config['appearance']['refplane_linewidth'])
+                self.text_xoffset = float(config['appearance']['text_xoffset'])
+                self.text_yoffset = float(config['appearance']['text_yoffset'])
+            else:
+                print(r'no config found, generating new ~APPDATA~\config.ini')
+                self.update_config()
         else:
-            print('no config found, generating new ./config.ini')
-            self.update_config()
+            file = Path("./config.ini")
+            config = configparser.ConfigParser()
+            if file.is_file():
+                print('config found, reading from ./config.ini')
+                config.read('config.ini')
+                self.custom_color = config['appearance']['custom_color']
+                self.gridcolor = config['appearance']['gridcolor']
+                self.text_color = config['appearance']['text_color']
+                self.pane_color = config['appearance']['pane_color']
+                self.gridlinewidth = float(config['appearance']['gridlinewidth'])
+                self.textsize = float(config['appearance']['textsize'])
+                self.markersize = float(config['appearance']['markersize'])
+                self.orbit_linewidth = float(config['appearance']['orbit_linewidth'])
+                self.refplane_linewidth = float(config['appearance']['refplane_linewidth'])
+                self.text_xoffset = float(config['appearance']['text_xoffset'])
+                self.text_yoffset = float(config['appearance']['text_yoffset'])
+
+
+            else:
+                print('no config found, generating new ./config.ini')
+                self.update_config()
 
     def update_config(self):
         '''update configfile with current memory variables'''
@@ -336,8 +366,16 @@ class MVP_application:
         'text_xoffset':str(self.text_xoffset), 'text_yoffset':str(self.text_yoffset), 'text_color':str(self.text_color),\
         'pane_color':str(self.pane_color)
         }
-        with open('config.ini', 'w') as configfile:
-            config.write(configfile)
+        if self.is_Windows:
+            dir = os.getenv('APPDATA')
+            file = dir+ r"\MVPtoolkit\config.ini"
+            if not os.path.exists(os.path.dirname(file)):
+                os.makedirs(os.path.dirname(file))
+            with open(file, 'w') as configfile:
+                config.write(configfile)
+        else:
+            with open('config.ini', 'w') as configfile:
+                config.write(configfile)
 
     def canvas_mouseturn(self,event):
         self.canvas.get_tk_widget().config(cursor=self.turn_cursor)
