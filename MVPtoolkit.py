@@ -313,9 +313,10 @@ class MVP_application:
         '''check if config exists, makes default config if not'''
         if self.is_Windows:
             file = os.getenv('APPDATA')
-            file = Path(file + r"\MVPtoolkit\config.ini")
+            file = file + r"\MVPtoolkit\config.ini"
+            print(file)
             config = configparser.ConfigParser()
-            if file.isfile():
+            if os.path.exists(file):
                 print(r'config found, reading from ~APPDATA~\config.ini')
                 config.read(file)
                 self.custom_color = config['appearance']['custom_color']
