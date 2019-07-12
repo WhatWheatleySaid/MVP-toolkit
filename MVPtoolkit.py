@@ -313,7 +313,7 @@ class MVP_application:
         '''check if config exists, makes default config if not'''
         if self.is_Windows:
             file = os.getenv('APPDATA')
-            file = file + r"\MVPtoolkit\config.ini"
+            file = Path(file + r"\MVPtoolkit\config.ini")
             config = configparser.ConfigParser()
             if file.isfile():
                 print(r'config found, reading from ~APPDATA~\config.ini')
