@@ -7,7 +7,7 @@ preliminary delta-V calculations.
 
 # Installation
 
-For Windows 10, the latest binary is available under the releades tab. 
+For Windows 10, the latest binary is available under the releases tab. 
 For other platforms, you'll have to install Python and the dependencies 
 Dependencies:
 matplotlib
