@@ -5,18 +5,21 @@ It is a hobby project, managed by a single person and mostly for educational pur
 spacemission planning phases (phase 0/A) with tools to calculate porkchopplots, rendeszvous and fictional encounters including 
 preliminary delta-V calculations.
 
+# Installation
+
+For Windows 10, the latest binary is available under the releades tab. 
+For other platforms, you'll have to install Python and the dependencies 
 Dependencies:
 matplotlib
 numpy
 jdcal
 tkcalendar
 requests
+pykep 
 
-optional:
-pykep (recommended!)
-![GUI](https://github.com/koba1312/MVP-toolkit/blob/master/images/MVP_toolkit_example.PNG)
-![GUI2](https://github.com/koba1312/MVP-toolkit/blob/master/images/porkchop_example.png)
-![MoonExample](https://github.com/koba1312/MVP-toolkit/blob/master/images/MoonExample.png)
-![GUI3](https://github.com/koba1312/MVP-toolkit/blob/master/images/MVP_toolkit_example2.PNG)
-![GUI4](https://github.com/koba1312/MVP-toolkit/blob/master/images/porkchop_menu.png)
-![plot1](https://github.com/koba1312/MVP-toolkit/blob/master/images/Apophis_example.jpg)
+![GUI](https://github.com/WhatWheatleySaid/MVP-toolkit/blob/master/images/MVP_toolkit_example.PNG)
+![GUI2](https://github.com/WhatWheatleySaid/MVP-toolkit/blob/master/images/porkchop_example.png)
+![MoonExample](https://github.com/WhatWheatleySaid/MVP-toolkit/blob/master/images/MoonExample.png)
+![GUI3](https://github.com/WhatWheatleySaid/MVP-toolkit/blob/master/images/MVP_toolkit_example2.PNG)
+![GUI4](https://github.com/WhatWheatleySaid/MVP-toolkit/blob/master/images/porkchop_menu.png)
+![plot1](https://github.com/WhatWheatleySaid/MVP-toolkit/blob/master/images/Apophis_example.jpg)
